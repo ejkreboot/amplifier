@@ -1,0 +1,310 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Soft-start bulk cap charge sim</title>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px 14px; }
+    label { display:block; font-size: 12px; color:#333; margin-top: 8px; }
+    input { width: 120px; }
+    button { padding: 8px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fafafa; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Bridge + Bulk Cap Charge (Soft-start → Relay Bypass)</h2>
+
+  <div class="row">
+    <div class="card">
+      <div><button id="runBtn">Run</button></div>
+
+      <label>Vac RMS</label>
+      <input id="vac" type="number" step="0.1" value="48">
+
+      <label>Line freq (Hz)</label>
+      <input id="freq" type="number" step="1" value="60">
+
+      <label>C (µF)</label>
+      <input id="cap" type="number" step="100" value="20000">
+
+      <label>Soft-start resistors (Ω each)</label>
+      <input id="rEach" type="number" step="1" value="68">
+
+      <label># resistors in parallel</label>
+      <input id="rCount" type="number" step="1" value="3">
+
+      <label>Diode drop per diode (V)</label>
+      <input id="vd" type="number" step="0.05" value="0.9">
+
+      <label>Relay ON threshold (V)</label>
+      <input id="vRelay" type="number" step="0.5" value="40">
+
+      <label>Bypass resistance (Ω)</label>
+      <input id="rBypass" type="number" step="0.1" value="1.0">
+
+      <label>Sim duration (s)</label>
+      <input id="tEnd" type="number" step="0.05" value="1.6">
+
+      <label>dt (µs)</label>
+      <input id="dtUs" type="number" step="10" value="50">
+
+      <div style="margin-top:10px; font-size:12px; color:#555;">
+        Tip: tune <b>Bypass resistance</b> and <b>diode drop</b> to match the knee and final asymptote.
+      </div>
+    </div>
+
+    <div class="card" style="flex: 1; min-width: 520px;">
+      <div id="plot" style="width: 100%; height: 480px;"></div>
+    </div>
+  </div>
+
+<script>
+function simulate(params) {
+  const {
+    vacRms, freq, C, rSoft, vDrop, vRelay, rBypass,
+    tEnd, dt
+  } = params;
+
+  const w = 2 * Math.PI * freq;
+  const Vpk = vacRms * Math.SQRT2;
+
+  let vcap = 0;
+  let relayClosed = false;
+
+  const t = [];
+  const v = [];
+  const rUsed = [];
+
+  const steps = Math.ceil(tEnd / dt);
+  for (let n = 0; n <= steps; n++) {
+    const tn = n * dt;
+
+    // Full-wave rectified secondary, minus bridge drop (2 diodes conducting)
+    const vrect = Math.max(0, Math.abs(Math.sin(w * tn)) * Vpk - vDrop);
+
+    // Relay state (simple threshold; you can add hysteresis later)
+    if (!relayClosed && vcap >= vRelay) relayClosed = true;
+
+    const R = relayClosed ? rBypass : rSoft;
+
+    // Ideal diode conduction: current only when source exceeds cap
+    if (vrect > vcap) {
+      const I = (vrect - vcap) / R;
+      vcap += (I / C) * dt;
+    }
+
+    t.push(tn);
+    v.push(vcap);
+    rUsed.push(R);
+  }
+
+  return { t, v, rUsed, Vpk };
+}
+
+function run() {
+  const vacRms = parseFloat(document.getElementById('vac').value);
+  const freq = parseFloat(document.getElementById('freq').value);
+  const C = parseFloat(document.getElementById('cap').value) * 1e-6;
+
+  const rEach = parseFloat(document.getElementById('rEach').value);
+  const rCount = parseInt(document.getElementById('rCount').value, 10);
+  const rSoft = rEach / rCount; // parallel (power-sharing)
+
+  const vd = parseFloat(document.getElementById('vd').value);
+  const vDrop = 2 * vd;
+
+  const vRelay = parseFloat(document.getElementById('vRelay').value);
+  const rBypass = parseFloat(document.getElementById('rBypass').value);
+
+  const tEnd = parseFloat(document.getElementById('tEnd').value);
+  const dt = parseFloat(document.getElementById('dtUs').value) * 1e-6;
+
+  const { t, v, Vpk } = simulate({
+    vacRms, freq, C, rSoft, vDrop, vRelay, rBypass, tEnd, dt
+  });
+
+  // Convert time to ms for scope-like feel
+  const tms = t.map(x => x * 1000);
+
+  // Find relay pickup time for a cursor/trigger marker
+  const relayIndex = v.findIndex(x => x >= vRelay);
+  const tRelay = relayIndex >= 0 ? tms[relayIndex] : null;
+
+  // === Oscilloscope look ===
+  const bg = "#028c67";
+  const gridMajor = "rgba(0,0,0,0.45)";
+  const gridMinor = "#3a3a3a";
+  const trace = "#67ecd0";
+  const text = "#cfeee6";
+
+  // Tek-ish: 10 major divisions across, 8 major divisions vertical (common graticule)
+  const tEndMs = tEnd * 1000;
+  const xMajor = tEndMs / 10;
+  const xMinor = xMajor / 5;
+
+  const vMax = Math.max(...v, vRelay);
+  const yTop = Math.ceil((vMax + 2) / 10) * 10; // round up to next 10V, add a hair
+  const yMajor = yTop / 8;
+  const yMinor = yMajor / 1;
+
+  // Glow effect: fat faint trace under bright trace
+  const traces = [
+    {
+      x: tms,
+      y: v,
+      mode: "lines",
+      line: { color: trace, width: 8 },
+      opacity: 0.18,
+      hoverinfo: "skip"
+    },
+    {
+      x: tms,
+      y: v,
+      mode: "lines",
+      line: { color: trace, width: 2.5 },
+      hovertemplate: "t=%{x:.1f} ms<br>V=%{y:.2f} V<extra></extra>"
+    }
+  ];
+
+  // Optional scanlines (subtle)
+  const scanlines = [];
+  for (let i = 0; i < 18; i++) {
+    const y0 = 0.06 + i * (0.92 / 18);
+    scanlines.push({
+      type: "rect",
+      xref: "paper", yref: "paper",
+      x0: 0.02, x1: 0.98,
+      y0, y1: y0 + (0.92 / 18) * 0.42,
+      fillcolor: "rgba(0,0,0,0.035)",
+      line: { width: 0 }
+    });
+  }
+
+  const layout = {
+    margin: { l: 62, r: 20, t: 16, b: 56 },
+    paper_bgcolor: bg,
+    plot_bgcolor: bg,
+    showlegend: false,
+    font: {
+      family: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+      color: text,
+      size: 12
+    },
+
+    xaxis: {
+      title: "",
+      range: [0, tEndMs],
+      dtick: xMajor,
+      tick0: 0,
+      ticks: "",
+      showline: false,
+      zeroline: false,
+      gridcolor: gridMajor,
+      gridwidth: 1,
+    minor: {
+    showgrid: true,
+    dtick: xMajor / 2,   // ONE midpoint line
+    gridcolor: "rgba(0,0,0,0.18)",
+    gridwidth: 1
+    },
+      tickfont: { color: text }
+    },
+
+    yaxis: {
+      title: "",
+      range: [0, yTop],
+      dtick: yMajor,
+      tick0: 0,
+      ticks: "",
+      showline: false,
+      zeroline: false,
+      gridcolor: gridMajor,
+      gridwidth: 1,
+      minor: {
+        showgrid: true,
+        dtick: yMinor,
+        gridcolor: gridMinor,
+        gridwidth: 1
+      },
+      tickfont: { color: text }
+    },
+
+    shapes: [
+      // Scanlines underneath everything else
+      ...scanlines,
+
+      // Outer bezel
+      {
+        type: "rect",
+        xref: "paper", yref: "paper",
+        x0: 0, y0: 0, x1: 1, y1: 1,
+        line: { color: "#0b2b22", width: 2 },
+        fillcolor: "rgba(0,0,0,0)"
+      },
+      // Inner graticule border
+      {
+        type: "rect",
+        xref: "paper", yref: "paper",
+        x0: 0.02, y0: 0.06, x1: 0.98, y1: 0.98,
+        line: { color: gridMajor, width: 1 },
+        fillcolor: "rgba(0,0,0,0)"
+      },
+
+      // Trigger/cursor at relay pickup time
+      ...(tRelay !== null ? [{
+        type: "line",
+        xref: "x", yref: "paper",
+        x0: tRelay, x1: tRelay,
+        y0: 0.06, y1: 0.98,
+        line: { color: text, width: 1, dash: "dot" }
+      }] : []),
+
+      // Small downward trigger marker at top
+      ...(tRelay !== null ? [{
+        type: "path",
+        xref: "x", yref: "paper",
+        path: `M ${tRelay} 0.98 L ${tRelay - xMajor*0.03} 0.945 L ${tRelay + xMajor*0.03} 0.945 Z`,
+        fillcolor: text,
+        line: { color: text, width: 0 }
+      }] : [])
+    ],
+
+    annotations: [
+      // Bottom status bar (scope readout)
+      {
+        xref: "paper", yref: "paper",
+        x: 0.02, y: 0.01,
+        xanchor: "left", yanchor: "bottom",
+        showarrow: false,
+        text: `CH2  ${yMajor.toFixed(1)}V/div   M  ${(xMajor).toFixed(0)}ms/div   ${tRelay !== null ? `TRIG @ ${vRelay.toFixed(0)}V` : ""}`,
+        font: { color: text, size: 12 },
+        bgcolor: "rgba(0,0,0,0.18)",
+        borderpad: 6
+      },
+      // Tiny “Tek Stop” joke label
+      {
+        xref: "paper", yref: "paper",
+        x: 0.02, y: 0.995,
+        xanchor: "left", yanchor: "top",
+        showarrow: false,
+        text: "Tek Stop",
+        font: { color: "rgba(207,238,230,0.75)", size: 11 }
+      }
+    ]
+  };
+
+  const config = {
+    responsive: true,
+    displayModeBar: false
+  };
+
+  Plotly.newPlot("plot", traces, layout, config);
+}
+
+document.getElementById('runBtn').addEventListener('click', run);
+run();
+</script>
+</body>
+</html>
