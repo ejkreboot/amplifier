@@ -77,6 +77,29 @@
 				font-weight: 600;
 			}
 
+			.tool-actions {
+				display: flex;
+				gap: 0.5rem;
+				flex-wrap: wrap;
+			}
+
+			.tool-actions button {
+				border: 1px solid #c0c0c0;
+				border-radius: 6px;
+				padding: 0.35rem 0.5rem;
+				font-size: 0.9rem;
+				background: #fafafa;
+				cursor: pointer;
+				flex: 1;
+			}
+
+			.tool-actions button.active {
+				border-color: #2563eb;
+				color: #0f172a;
+				background: #e0ecff;
+				font-weight: 600;
+			}
+
 			.zoom-control {
 				display: flex;
 				align-items: center;
@@ -114,6 +137,29 @@
 				font-size: 0.85rem;
 				color: #555;
 			}
+
+			.netlist-panel {
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+
+			.netlist-panel h2 {
+				font-size: 1rem;
+				margin: 0;
+			}
+
+			.netlist-output {
+				min-height: 140px;
+				border: 1px solid #d0d0d0;
+				border-radius: 6px;
+				padding: 0.5rem;
+				background: #f8f8f8;
+				font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+				font-size: 0.85rem;
+				white-space: pre;
+				overflow: auto;
+			}
 		</style>
 	</head>
 	<body>
@@ -124,12 +170,25 @@
 			<section class="panel">
 				<h2>Components</h2>
 				<div class="palette" id="componentPalette"></div>
-				<p class="status-line">Click inside the canvas to place the active component. Grid size: 25px.</p>
+				<div class="tool-actions">
+					<button type="button" id="wireToolToggle">Wire Tool</button>
+				</div>
+				<p class="status-line">Click inside the canvas to place the active component. Toggle the wire tool to connect pins. Grid size: 20px.</p>
 				<label class="zoom-control" for="zoomControl">
 					<span>Zoom</span>
-					<input type="range" id="zoomControl" min="0.5" max="2" step="0.1" value="1" />
+					<input type="range" id="zoomControl" min="0.5" max="3" step="0.1" value="1" />
 					<output id="zoomValue" for="zoomControl">100%</output>
 				</label>
+				<div class="netlist-panel" aria-live="polite">
+					<h2>Netlist</h2>
+					<div
+						id="netlistOutput"
+						class="netlist-output"
+						role="textbox"
+						aria-readonly="true"
+						tabindex="0"
+					></div>
+				</div>
 			</section>
 			<div class="canvas-wrapper">
 				<canvas id="editorCanvas" width="1000" height="650" aria-label="Circuit editor canvas"></canvas>
@@ -138,21 +197,41 @@
 
 		<script>
 			const GRID_SIZE = 20;
+			const MIN_ZOOM = 0.5;
+			const MAX_ZOOM = 3;
+			const ZOOM_SENSITIVITY = 0.0015;
+			const TOOL_PLACE = "place";
+			const TOOL_WIRE = "wire";
+			const PIN_HIT_RADIUS = 10;
 			const canvas = document.getElementById("editorCanvas");
 			const ctx = canvas.getContext("2d");
 			const palette = document.getElementById("componentPalette");
 			const zoomControl = document.getElementById("zoomControl");
 			const zoomValue = document.getElementById("zoomValue");
+			const wireToolToggle = document.getElementById("wireToolToggle");
+			const netlistOutput = document.getElementById("netlistOutput");
 
 			const state = {
 				library: {},
 				sprites: {},
 				placements: [],
+				wires: [],
+				nextPlacementId: 1,
+				nextWireId: 1,
 				selected: null,
 				ready: false,
 				dragging: null,
-				activePointerId: null,
+				dragPointerId: null,
 				zoom: 1,
+				panX: 0,
+				panY: 0,
+				panning: null,
+				panPointerId: null,
+				spacePanning: false,
+				activeTool: TOOL_PLACE,
+				pendingWire: null,
+				pointerWorld: null,
+				netlistText: "",
 			};
 
 			document.addEventListener("DOMContentLoaded", () => {
@@ -161,21 +240,45 @@
 				canvas.addEventListener("pointermove", handlePointerMove);
 				canvas.addEventListener("pointerup", handlePointerUp);
 				canvas.addEventListener("pointercancel", handlePointerUp);
+				canvas.addEventListener("pointerleave", handlePointerLeave);
+				canvas.addEventListener("wheel", handleWheel, { passive: false });
+				canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 				if (zoomControl) {
 					zoomControl.addEventListener("input", handleZoomInput);
 				}
+				if (wireToolToggle) {
+					wireToolToggle.addEventListener("click", toggleWireTool);
+					updateWireToggleUI();
+				}
+				document.addEventListener("keydown", handleKeyDown, true);
+				document.addEventListener("keyup", handleKeyUp, true);
+				updateNetlist();
 			});
 
 			function handleZoomInput(event) {
-				const nextZoom = Number(event.target.value);
+				const nextZoom = clamp(Number(event.target.value), MIN_ZOOM, MAX_ZOOM);
 				if (!Number.isFinite(nextZoom) || nextZoom <= 0) {
 					return;
 				}
-				state.zoom = nextZoom;
-				if (zoomValue) {
-					zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+				const focus = canvasToWorld(canvas.width / 2, canvas.height / 2);
+				applyZoom(nextZoom, focus, { x: canvas.width / 2, y: canvas.height / 2 });
+			}
+
+			function handleWheel(event) {
+				if (!state.ready) {
+					return;
 				}
-				requestRender();
+				event.preventDefault();
+				const metrics = getCanvasMetrics();
+				const canvasPoint = {
+					x: (event.clientX - metrics.rect.left) * metrics.scaleX,
+					y: (event.clientY - metrics.rect.top) * metrics.scaleY,
+				};
+				const focusWorld = canvasToWorld(canvasPoint.x, canvasPoint.y);
+				const delta = -event.deltaY;
+				const zoomFactor = Math.exp(delta * ZOOM_SENSITIVITY);
+				const nextZoom = clamp(state.zoom * zoomFactor, MIN_ZOOM, MAX_ZOOM);
+				applyZoom(nextZoom, focusWorld, canvasPoint);
 			}
 
 			async function loadLibrary() {
@@ -198,10 +301,44 @@
 					state.selected = entries[0][0];
 					state.ready = true;
 					updatePalette();
+					updateNetlist();
 					requestRender();
 				} catch (error) {
 					console.error(error);
 				}
+			}
+
+			function toggleWireTool() {
+				setActiveTool(isWireMode() ? TOOL_PLACE : TOOL_WIRE);
+			}
+
+			function setActiveTool(nextTool) {
+				if (state.activeTool === nextTool) {
+					return;
+				}
+				state.activeTool = nextTool;
+				if (!isWireMode()) {
+					state.pendingWire = null;
+				}
+				updateWireToggleUI();
+				requestRender();
+			}
+
+			function updateWireToggleUI() {
+				if (!wireToolToggle) {
+					return;
+				}
+				if (isWireMode()) {
+					wireToolToggle.classList.add("active");
+					wireToolToggle.textContent = "Wire Tool (On)";
+				} else {
+					wireToolToggle.classList.remove("active");
+					wireToolToggle.textContent = "Wire Tool";
+				}
+			}
+
+			function isWireMode() {
+				return state.activeTool === TOOL_WIRE;
 			}
 
 			function handlePointerDown(event) {
@@ -209,7 +346,22 @@
 					return;
 				}
 
+				const isPanInteraction = state.spacePanning || event.button === 1 || event.button === 2;
+				if (isPanInteraction) {
+					beginPan(event);
+					return;
+				}
+
+				if (event.button !== 0) {
+					return;
+				}
+
 				const point = getCanvasCoordinates(event);
+				if (isWireMode()) {
+					handleWirePointerDown(point);
+					event.preventDefault();
+					return;
+				}
 				const hitIndex = findPlacementAt(point);
 				if (hitIndex !== -1) {
 					const hitPlacement = state.placements[hitIndex];
@@ -218,7 +370,7 @@
 						offsetX: point.x - hitPlacement.x,
 						offsetY: point.y - hitPlacement.y,
 					};
-					state.activePointerId = event.pointerId;
+					state.dragPointerId = event.pointerId;
 					if (typeof canvas.setPointerCapture === "function") {
 						canvas.setPointerCapture(event.pointerId);
 					}
@@ -234,35 +386,142 @@
 					y: snapToGrid(point.y),
 				};
 
+				const placementId = state.nextPlacementId++;
 				state.placements.push({
+					id: placementId,
 					type: state.selected,
 					x: snapped.x,
 					y: snapped.y,
 				});
 
+				updateNetlist();
+				requestRender();
+			}
+
+			function handleWirePointerDown(point) {
+				const hit = findPinAt(point);
+				if (!hit) {
+					return;
+				}
+				const placementId = ensurePlacementId(hit.placement);
+				const targetRef = {
+					placementId,
+					pinId: hit.pin.id,
+				};
+				if (!state.pendingWire) {
+					state.pendingWire = { from: targetRef };
+					requestRender();
+					return;
+				}
+				const samePin =
+					state.pendingWire.from.placementId === targetRef.placementId &&
+					state.pendingWire.from.pinId === targetRef.pinId;
+				if (samePin) {
+					state.pendingWire = null;
+					requestRender();
+					return;
+				}
+				const newWire = createWireBetween(state.pendingWire.from, targetRef);
+				if (newWire) {
+					state.wires.push(newWire);
+					updateNetlist();
+				}
+				state.pendingWire = null;
 				requestRender();
 			}
 
 			function getCanvasCoordinates(event) {
-				const rect = canvas.getBoundingClientRect();
-				const scaleX = canvas.width / rect.width;
-				const scaleY = canvas.height / rect.height;
-				return {
-					x: ((event.clientX - rect.left) * scaleX) / state.zoom,
-					y: ((event.clientY - rect.top) * scaleY) / state.zoom,
-				};
+				const metrics = getCanvasMetrics();
+				const canvasX = (event.clientX - metrics.rect.left) * metrics.scaleX;
+				const canvasY = (event.clientY - metrics.rect.top) * metrics.scaleY;
+				return canvasToWorld(canvasX, canvasY);
 			}
 
 			function snapToGrid(value) {
 				return Math.round(value / GRID_SIZE) * GRID_SIZE;
 			}
 
+			function updatePointerWorldFromEvent(event) {
+				const point = getCanvasCoordinates(event);
+				updatePointerWorld(point);
+				return point;
+			}
+
+			function updatePointerWorld(point) {
+				if (!point) {
+					return;
+				}
+				const snappedPoint = {
+					x: snapToGrid(point.x),
+					y: snapToGrid(point.y),
+				};
+				const prev = state.pointerWorld;
+				if (!prev || prev.x !== snappedPoint.x || prev.y !== snappedPoint.y) {
+					state.pointerWorld = snappedPoint;
+					if (isWireMode() && state.pendingWire) {
+						requestRender();
+					}
+				}
+			}
+
+			function clearPointerWorld() {
+				if (state.pointerWorld) {
+					state.pointerWorld = null;
+					if (isWireMode() && state.pendingWire) {
+						requestRender();
+					}
+				}
+			}
+
+			function beginPan(event) {
+				state.panning = {
+					pointerId: event.pointerId,
+					startX: event.clientX,
+					startY: event.clientY,
+					panX: state.panX,
+					panY: state.panY,
+				};
+				state.panPointerId = event.pointerId;
+				if (typeof canvas.setPointerCapture === "function") {
+					canvas.setPointerCapture(event.pointerId);
+				}
+				event.preventDefault();
+			}
+
+			function updatePan(event) {
+				if (!state.panning) {
+					return;
+				}
+				const metrics = getCanvasMetrics();
+				const deltaX = (event.clientX - state.panning.startX) * metrics.scaleX;
+				const deltaY = (event.clientY - state.panning.startY) * metrics.scaleY;
+				state.panX = state.panning.panX - deltaX / state.zoom;
+				state.panY = state.panning.panY - deltaY / state.zoom;
+				requestRender();
+			}
+
+			function endPan(pointerId) {
+				if (pointerId === state.panPointerId && typeof canvas.releasePointerCapture === "function") {
+					canvas.releasePointerCapture(state.panPointerId);
+				}
+				state.panning = null;
+				state.panPointerId = null;
+			}
+
 			function handlePointerMove(event) {
-				if (!state.dragging) {
+				if (state.panPointerId === event.pointerId && state.panning) {
+					updatePan(event);
+					updatePointerWorldFromEvent(event);
 					return;
 				}
 
 				const point = getCanvasCoordinates(event);
+				updatePointerWorld(point);
+
+				if (!state.dragging || event.pointerId !== state.dragPointerId) {
+					return;
+				}
+
 				const placement = state.placements[state.dragging.index];
 				if (!placement) {
 					return;
@@ -273,20 +532,31 @@
 				if (placement.x !== nextX || placement.y !== nextY) {
 					placement.x = nextX;
 					placement.y = nextY;
+					const placementId = ensurePlacementId(placement);
+					rerouteWiresForPlacement(placementId);
 					requestRender();
 				}
 			}
 
 			function handlePointerUp(event) {
-				if (!state.dragging || event.pointerId !== state.activePointerId) {
+				if (state.panPointerId === event.pointerId) {
+					endPan(event.pointerId);
 					return;
 				}
 
-				if (state.activePointerId !== null && typeof canvas.releasePointerCapture === "function") {
-					canvas.releasePointerCapture(state.activePointerId);
+				if (!state.dragging || event.pointerId !== state.dragPointerId) {
+					return;
+				}
+
+				if (state.dragPointerId !== null && typeof canvas.releasePointerCapture === "function") {
+					canvas.releasePointerCapture(state.dragPointerId);
 				}
 				state.dragging = null;
-				state.activePointerId = null;
+				state.dragPointerId = null;
+			}
+
+			function handlePointerLeave() {
+				clearPointerWorld();
 			}
 
 			function findPlacementAt(point) {
@@ -308,6 +578,295 @@
 					}
 				}
 				return -1;
+			}
+
+			function findPinAt(point) {
+				for (let i = state.placements.length - 1; i >= 0; i -= 1) {
+					const placement = state.placements[i];
+					const component = state.library[placement.type];
+					if (!component) {
+						continue;
+					}
+					for (const pin of component.pins || []) {
+						const pinPosition = getPinWorldPosition(placement, pin);
+						if (!pinPosition) {
+							continue;
+						}
+						const distance = Math.hypot(point.x - pinPosition.x, point.y - pinPosition.y);
+						if (distance <= PIN_HIT_RADIUS) {
+							ensurePlacementId(placement);
+							return { placement, pin, position: pinPosition };
+						}
+					}
+				}
+				return null;
+			}
+
+			function getPinWorldPosition(placement, pin) {
+				const component = state.library[placement.type];
+				if (!component || !pin) {
+					return null;
+				}
+				const halfWidth = component.size.width / 2;
+				const halfHeight = component.size.height / 2;
+				return {
+					x: placement.x - halfWidth + pin.position.x,
+					y: placement.y - halfHeight + pin.position.y,
+				};
+			}
+
+			function findPlacementById(placementId) {
+				return state.placements.find((placement) => placement.id === placementId) || null;
+			}
+
+			function ensurePlacementId(placement) {
+				if (!placement.id) {
+					placement.id = state.nextPlacementId++;
+				}
+				return placement.id;
+			}
+
+			function getPinDefinition(placement, pinId) {
+				const component = state.library[placement.type];
+				if (!component) {
+					return null;
+				}
+				return (component.pins || []).find((pin) => pin.id === pinId) || null;
+			}
+
+			function getPinPositionFromRef(ref) {
+				const placement = findPlacementById(ref.placementId);
+				if (!placement) {
+					return null;
+				}
+				const pin = getPinDefinition(placement, ref.pinId);
+				if (!pin) {
+					return null;
+				}
+				return getPinWorldPosition(placement, pin);
+			}
+
+			function createWireBetween(fromRef, toRef) {
+				if (!fromRef || !toRef) {
+					return null;
+				}
+				if (fromRef.placementId === toRef.placementId && fromRef.pinId === toRef.pinId) {
+					return null;
+				}
+				const path = buildWirePath(fromRef, toRef);
+				if (!path) {
+					return null;
+				}
+				return {
+					id: state.nextWireId++,
+					from: { ...fromRef },
+					to: { ...toRef },
+					path,
+				};
+			}
+
+			function buildWirePath(fromRef, toRef) {
+				const startPoint = getPinPositionFromRef(fromRef);
+				const endPoint = getPinPositionFromRef(toRef);
+				if (!startPoint || !endPoint) {
+					return null;
+				}
+				return buildManhattanPath(startPoint, endPoint);
+			}
+
+			function buildManhattanPath(startPoint, endPoint) {
+				if (!startPoint || !endPoint) {
+					return null;
+				}
+				const path = [{ x: startPoint.x, y: startPoint.y }];
+				const needsBend = startPoint.x !== endPoint.x && startPoint.y !== endPoint.y;
+				if (needsBend) {
+					path.push({ x: endPoint.x, y: startPoint.y });
+				}
+				path.push({ x: endPoint.x, y: endPoint.y });
+				return path;
+			}
+
+			function getPendingWirePreviewPath() {
+				if (!state.pendingWire || !state.pointerWorld) {
+					return null;
+				}
+				const originPoint = getPinPositionFromRef(state.pendingWire.from);
+				if (!originPoint) {
+					return null;
+				}
+				return buildManhattanPath(originPoint, state.pointerWorld);
+			}
+
+			function rerouteWiresForPlacement(placementId) {
+				if (!placementId) {
+					return;
+				}
+				state.wires.forEach((wire) => {
+					if (wire.from.placementId === placementId || wire.to.placementId === placementId) {
+						const nextPath = buildWirePath(wire.from, wire.to);
+						if (nextPath) {
+							wire.path = nextPath;
+						}
+					}
+				});
+			}
+
+			function updateNetlist() {
+				if (!state.ready) {
+					state.netlistText = "* Component library loading...";
+					syncNetlistOutput();
+					return;
+				}
+				state.netlistText = buildNetlistText();
+				syncNetlistOutput();
+			}
+
+			function syncNetlistOutput() {
+				if (netlistOutput) {
+					netlistOutput.textContent = state.netlistText || "";
+				}
+			}
+
+			function buildNetlistText() {
+				const pinToNet = buildNetAssignments();
+				const prefixCounters = new Map();
+				const lines = [];
+				state.placements.forEach((placement) => {
+					const component = state.library[placement.type];
+					if (!component) {
+						return;
+					}
+					const placementId = ensurePlacementId(placement);
+					const prefix = guessDesignatorPrefix(placement.type, component);
+					const nextIndex = (prefixCounters.get(prefix) || 0) + 1;
+					prefixCounters.set(prefix, nextIndex);
+					const reference = `${prefix}${nextIndex}`;
+					const pins = component.pins || [];
+					const nodeLabels = pins.map((pin, index) => {
+						const key = makePinKey(placementId, pin.id);
+						return pinToNet.get(key) || `NC${index + 1}`;
+					});
+					const value = component.value || component.defaultValue || defaultComponentValue(prefix);
+					const comment = component.name ? ` ; ${component.name}` : "";
+					lines.push(`${reference} ${nodeLabels.join(" ")} ${value}${comment}`);
+				});
+				if (!lines.length) {
+					return "* Netlist is empty. Place components to begin.";
+				}
+				lines.unshift("* Auto-generated SPICE netlist");
+				return lines.join("\n");
+			}
+
+			function buildNetAssignments() {
+				const uf = new UnionFind();
+				const pinRefs = [];
+				state.placements.forEach((placement) => {
+					const component = state.library[placement.type];
+					if (!component) {
+						return;
+					}
+					const placementId = ensurePlacementId(placement);
+					(component.pins || []).forEach((pin) => {
+						const key = makePinKey(placementId, pin.id);
+						pinRefs.push(key);
+						uf.add(key);
+					});
+				});
+				state.wires.forEach((wire) => {
+					const fromKey = makePinKey(wire.from.placementId, wire.from.pinId);
+					const toKey = makePinKey(wire.to.placementId, wire.to.pinId);
+					uf.add(fromKey);
+					uf.add(toKey);
+					uf.union(fromKey, toKey);
+				});
+				const pinToNet = new Map();
+				const rootToLabel = new Map();
+				let nextLabelIndex = 1;
+				pinRefs.forEach((key) => {
+					const root = uf.find(key);
+					let label = rootToLabel.get(root);
+					if (!label) {
+						label = `N${String(nextLabelIndex).padStart(3, "0")}`;
+						nextLabelIndex += 1;
+						rootToLabel.set(root, label);
+					}
+					pinToNet.set(key, label);
+				});
+				return pinToNet;
+			}
+
+			function defaultComponentValue(prefix) {
+				switch (prefix) {
+					case "R":
+						return "1";
+					case "C":
+						return "1p";
+					case "L":
+						return "1n";
+					default:
+						return "1";
+				}
+			}
+
+			function guessDesignatorPrefix(typeKey, component) {
+				const source = `${typeKey || ""} ${component?.name || ""}`.toLowerCase();
+				if (source.includes("res")) {
+					return "R";
+				}
+				if (source.includes("cap")) {
+					return "C";
+				}
+				if (source.includes("ind") || source.includes("coil")) {
+					return "L";
+				}
+				if (source.includes("voltage") && source.includes("source")) {
+					return "V";
+				}
+				return "X";
+			}
+
+			function makePinKey(placementId, pinId) {
+				return `${placementId}:${pinId}`;
+			}
+
+			class UnionFind {
+				constructor() {
+					this.parent = new Map();
+				}
+
+				add(key) {
+					if (!this.parent.has(key)) {
+						this.parent.set(key, key);
+					}
+				}
+
+				find(key) {
+					if (!this.parent.has(key)) {
+						this.parent.set(key, key);
+						return key;
+					}
+					let root = key;
+					while (root !== this.parent.get(root)) {
+						root = this.parent.get(root);
+					}
+					let node = key;
+					while (node !== root) {
+						const parent = this.parent.get(node);
+						this.parent.set(node, root);
+						node = parent;
+					}
+					return root;
+				}
+
+				union(a, b) {
+					const rootA = this.find(a);
+					const rootB = this.find(b);
+					if (rootA === rootB) {
+						return;
+					}
+					this.parent.set(rootB, rootA);
+				}
 			}
 
 			function buildSprite(key, component) {
@@ -339,6 +898,7 @@
 					}
 					button.addEventListener("click", () => {
 						state.selected = key;
+						setActiveTool(TOOL_PLACE);
 						updatePalette();
 					});
 					palette.appendChild(button);
@@ -361,29 +921,68 @@
 				const scale = state.zoom;
 				ctx.save();
 				ctx.scale(scale, scale);
-				const viewWidth = canvas.width / scale;
-				const viewHeight = canvas.height / scale;
-				drawGrid(viewWidth, viewHeight, scale);
+				ctx.translate(-state.panX, -state.panY);
+				drawGrid(scale);
+				drawWires(scale);
 				state.placements.forEach((instance) => drawComponent(instance, scale));
 				ctx.restore();
 			}
 
-			function drawGrid(viewWidth, viewHeight, scale) {
+			function drawGrid(scale) {
 				ctx.save();
 				ctx.strokeStyle = "#99baaa";
-				ctx.setLineDash([1, 3]);
-				ctx.lineWidth = 0.5;
+				const dashLength = 1 / scale;
+				ctx.setLineDash([dashLength, dashLength * 3]);
+				ctx.lineWidth = Math.max(0.5 / scale, 0.25 / scale);
+				const left = state.panX;
+				const top = state.panY;
+				const right = left + canvas.width / scale;
+				const bottom = top + canvas.height / scale;
+				const startX = Math.floor(left / GRID_SIZE) * GRID_SIZE - GRID_SIZE;
+				const startY = Math.floor(top / GRID_SIZE) * GRID_SIZE - GRID_SIZE;
 				ctx.beginPath();
-				for (let x = 0; x <= viewWidth; x += GRID_SIZE) {
-					ctx.moveTo(x + 0.5, 0);
-					ctx.lineTo(x + 0.5, viewHeight);
+				for (let x = startX; x <= right + GRID_SIZE; x += GRID_SIZE) {
+					ctx.moveTo(x, top - GRID_SIZE);
+					ctx.lineTo(x, bottom + GRID_SIZE);
 				}
-				for (let y = 0; y <= viewHeight; y += GRID_SIZE) {
-					ctx.moveTo(0, y + 0.5);
-					ctx.lineTo(viewWidth, y + 0.5);
+				for (let y = startY; y <= bottom + GRID_SIZE; y += GRID_SIZE) {
+					ctx.moveTo(left - GRID_SIZE, y);
+					ctx.lineTo(right + GRID_SIZE, y);
 				}
 				ctx.stroke();
 				ctx.restore();
+			}
+
+			function drawWires(scale) {
+				ctx.save();
+				ctx.lineWidth = Math.max(2 / scale, 1 / scale);
+				ctx.lineJoin = "round";
+				ctx.lineCap = "round";
+				ctx.strokeStyle = "#0f172a";
+				state.wires.forEach((wire) => drawWirePath(wire.path));
+				if (isWireMode() && state.pendingWire) {
+					const previewPath = getPendingWirePreviewPath();
+					if (previewPath) {
+						ctx.save();
+						ctx.setLineDash([8 / scale, 6 / scale]);
+						ctx.strokeStyle = "#2563eb";
+						drawWirePath(previewPath);
+						ctx.restore();
+					}
+				}
+				ctx.restore();
+			}
+
+			function drawWirePath(path) {
+				if (!path || path.length < 2) {
+					return;
+				}
+				ctx.beginPath();
+				ctx.moveTo(path[0].x, path[0].y);
+				for (let i = 1; i < path.length; i += 1) {
+					ctx.lineTo(path[i].x, path[i].y);
+				}
+				ctx.stroke();
 			}
 
 			function drawComponent(instance, scale) {
@@ -401,16 +1000,99 @@
 				ctx.drawImage(sprite, drawX, drawY, component.size.width, component.size.height);
 
 				ctx.save();
-				ctx.fillStyle = "#2563eb";
+				const placementId = ensurePlacementId(instance);
 				const pinRadius = 4 / scale;
 				component.pins.forEach((pin) => {
 					const pinX = drawX + pin.position.x;
 					const pinY = drawY + pin.position.y;
+					const isActivePin =
+						state.pendingWire &&
+						state.pendingWire.from.placementId === placementId &&
+						state.pendingWire.from.pinId === pin.id;
+					ctx.fillStyle = isActivePin ? "#f97316" : "#2563eb";
 					ctx.beginPath();
 					ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
 					ctx.fill();
 				});
 				ctx.restore();
+			}
+
+			function handleKeyDown(event) {
+				if (event.code === "Escape" && !shouldIgnoreKey(event)) {
+					if (state.pendingWire) {
+						state.pendingWire = null;
+						requestRender();
+					}
+					if (isWireMode()) {
+						setActiveTool(TOOL_PLACE);
+					}
+					return;
+				}
+				if (event.code === "Space" && !shouldIgnoreKey(event)) {
+					if (!state.spacePanning) {
+						state.spacePanning = true;
+					}
+					event.preventDefault();
+				}
+			}
+
+			function handleKeyUp(event) {
+				if (event.code === "Space") {
+					state.spacePanning = false;
+				}
+			}
+
+			function shouldIgnoreKey(event) {
+				const target = event.target;
+				if (!target) {
+					return false;
+				}
+				const tag = target.tagName;
+				return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+			}
+
+			function getCanvasMetrics() {
+				const rect = canvas.getBoundingClientRect();
+				return {
+					rect,
+					scaleX: canvas.width / rect.width,
+					scaleY: canvas.height / rect.height,
+				};
+			}
+
+			function canvasToWorld(canvasX, canvasY) {
+				return {
+					x: state.panX + canvasX / state.zoom,
+					y: state.panY + canvasY / state.zoom,
+				};
+			}
+
+			function applyZoom(nextZoom, focusWorld, canvasPoint) {
+				const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+				const screenPoint = canvasPoint || { x: canvas.width / 2, y: canvas.height / 2 };
+				const focus = focusWorld || canvasToWorld(screenPoint.x, screenPoint.y);
+				if (!Number.isFinite(clampedZoom) || clampedZoom === state.zoom) {
+					syncZoomControls();
+					return;
+				}
+				state.zoom = clampedZoom;
+				state.panX = focus.x - screenPoint.x / state.zoom;
+				state.panY = focus.y - screenPoint.y / state.zoom;
+				syncZoomControls();
+				requestRender();
+			}
+
+			function syncZoomControls() {
+				if (zoomControl && document.activeElement !== zoomControl) {
+					zoomControl.value = state.zoom.toFixed(2);
+				}
+				if (zoomValue) {
+					zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+				}
+			}
+
+			function clamp(value, min, max) {
+				return Math.min(max, Math.max(min, value));
 			}
 		</script>
 	</body>
