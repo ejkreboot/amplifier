@@ -237,6 +237,7 @@
 				pointerWorld: null,
 				hoverPlacementId: null,
 				netlistText: "",
+				referenceMap: Object.create(null),
 			};
 
 			document.addEventListener("DOMContentLoaded", () => {
@@ -964,9 +965,11 @@
 			function updateNetlist() {
 				if (!state.ready) {
 					state.netlistText = "* Component library loading...";
+					state.referenceMap = Object.create(null);
 					syncNetlistOutput();
 					return;
 				}
+				state.referenceMap = Object.create(null);
 				state.netlistText = buildNetlistText();
 				syncNetlistOutput();
 			}
@@ -981,6 +984,8 @@
 				const pinToNet = buildNetAssignments();
 				const prefixCounters = new Map();
 				const lines = [];
+				const referenceMap = state.referenceMap || Object.create(null);
+				state.referenceMap = referenceMap;
 				state.placements.forEach((placement) => {
 					const component = state.library[placement.type];
 					if (!component) {
@@ -991,6 +996,7 @@
 					const nextIndex = (prefixCounters.get(prefix) || 0) + 1;
 					prefixCounters.set(prefix, nextIndex);
 					const reference = `${prefix}${nextIndex}`;
+					referenceMap[placementId] = reference;
 					const pins = component.pins || [];
 					const nodeLabels = pins.map((pin, index) => {
 						const key = makePinKey(placementId, pin.id);
@@ -1295,21 +1301,35 @@
 				const localDrawX = -halfWidth;
 				const localDrawY = -halfHeight;
 				const valueLabel = getPlacementValue(instance);
-				let labelWorldPosition = null;
-				if (valueLabel) {
-					const minOffset = 6;
-					const maxOffset = 14;
-					const orientationFactor = Math.abs(Math.sin(rotationRadians));
-					const pixelOffset = minOffset + (maxOffset - minOffset) * orientationFactor;
-					const labelLocal = { x: 0, y: localDrawY - pixelOffset / scale };
-					const rotatedOffset = rotationRadians
-						? rotatePoint(labelLocal.x, labelLocal.y, rotationRadians)
-						: labelLocal;
-					labelWorldPosition = {
-						x: instance.x + rotatedOffset.x,
-						y: instance.y + rotatedOffset.y,
-					};
-				}
+				const placementId = ensurePlacementId(instance);
+				const referenceLabel = state.referenceMap ? state.referenceMap[placementId] : null;
+				const orientationFactor = Math.abs(Math.sin(rotationRadians));
+				const topAnchorY = localDrawY;
+				const bottomAnchorY = localDrawY + component.size.height;
+				const valueLabelPosition = valueLabel
+					? getLabelWorldPosition(
+						instance,
+						topAnchorY,
+						rotationRadians,
+						scale,
+						-1,
+						6,
+						14,
+						orientationFactor
+					)
+					: null;
+				const referenceLabelPosition = referenceLabel
+					? getLabelWorldPosition(
+						instance,
+						bottomAnchorY,
+						rotationRadians,
+						scale,
+						1,
+						4,
+						12,
+						orientationFactor
+					)
+					: null;
 
 				ctx.save();
 				ctx.translate(instance.x, instance.y);
@@ -1318,7 +1338,6 @@
 				}
 				ctx.drawImage(sprite, localDrawX, localDrawY, component.size.width, component.size.height);
 
-				const placementId = ensurePlacementId(instance);
 				const pinRadius = 4 / scale;
 				const pins = component.pins || [];
 				pins.forEach((pin) => {
@@ -1335,7 +1354,7 @@
 				});
 				ctx.restore();
 
-				if (valueLabel && labelWorldPosition) {
+				if (valueLabel && valueLabelPosition) {
 					ctx.save();
 					const pixelFontSize = 14;
 					const fontSize = pixelFontSize / scale;
@@ -1343,7 +1362,19 @@
 					ctx.textAlign = "center";
 					ctx.textBaseline = "bottom";
 					ctx.fillStyle = "#0f172a";
-					ctx.fillText(valueLabel, labelWorldPosition.x, labelWorldPosition.y);
+					ctx.fillText(valueLabel, valueLabelPosition.x, valueLabelPosition.y);
+					ctx.restore();
+				}
+
+				if (referenceLabel && referenceLabelPosition) {
+					ctx.save();
+					const pixelFontSize = 12;
+					const fontSize = pixelFontSize / scale;
+					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					ctx.textAlign = "center";
+					ctx.textBaseline = "top";
+					ctx.fillStyle = "#1f2937";
+					ctx.fillText(referenceLabel, referenceLabelPosition.x, referenceLabelPosition.y);
 					ctx.restore();
 				}
 			}
@@ -1440,6 +1471,37 @@
 				return {
 					x: x * cosA - y * sinA,
 					y: x * sinA + y * cosA,
+				};
+			}
+
+			function getLabelWorldPosition(
+				instance,
+				anchorY,
+				rotationRadians,
+				scale,
+				direction,
+				minOffset,
+				maxOffset,
+				orientationFactor
+			) {
+				if (!instance || !Number.isFinite(scale) || scale === 0) {
+					return null;
+				}
+				const normalizedDirection = direction >= 0 ? 1 : -1;
+				const factor = Number.isFinite(orientationFactor)
+					? orientationFactor
+					: Math.abs(Math.sin(rotationRadians));
+				const pixelOffset = minOffset + (maxOffset - minOffset) * factor;
+				const localPoint = {
+					x: 0,
+					y: anchorY + (normalizedDirection * pixelOffset) / scale,
+				};
+				const rotated = rotationRadians
+					? rotatePoint(localPoint.x, localPoint.y, rotationRadians)
+					: localPoint;
+				return {
+					x: instance.x + rotated.x,
+					y: instance.y + rotated.y,
 				};
 			}
 
