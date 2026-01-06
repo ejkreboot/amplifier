@@ -241,6 +241,7 @@
 				canvas.addEventListener("pointerup", handlePointerUp);
 				canvas.addEventListener("pointercancel", handlePointerUp);
 				canvas.addEventListener("pointerleave", handlePointerLeave);
+				canvas.addEventListener("dblclick", handleDoubleClick);
 				canvas.addEventListener("wheel", handleWheel, { passive: false });
 				canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 				if (zoomControl) {
@@ -392,6 +393,7 @@
 					type: state.selected,
 					x: snapped.x,
 					y: snapped.y,
+					value: resolveComponentValue(state.selected),
 				});
 
 				updateNetlist();
@@ -557,6 +559,32 @@
 
 			function handlePointerLeave() {
 				clearPointerWorld();
+			}
+
+			function handleDoubleClick(event) {
+				if (!state.ready) {
+					return;
+				}
+				const point = getCanvasCoordinates(event);
+				const hitIndex = findPlacementAt(point);
+				if (hitIndex === -1) {
+					return;
+				}
+				const placement = state.placements[hitIndex];
+				const previousValue = getPlacementValue(placement);
+				const nextValue = window.prompt("Component value", previousValue);
+				if (nextValue === null) {
+					return;
+				}
+				const trimmed = nextValue.trim();
+				if (trimmed) {
+					placement.value = trimmed;
+				} else {
+					delete placement.value;
+				}
+				updateNetlist();
+				requestRender();
+				event.preventDefault();
 			}
 
 			function findPlacementAt(point) {
@@ -747,7 +775,7 @@
 						const key = makePinKey(placementId, pin.id);
 						return pinToNet.get(key) || `NC${index + 1}`;
 					});
-					const value = component.value || component.defaultValue || defaultComponentValue(prefix);
+					const value = getPlacementValue(placement);
 					const comment = component.name ? ` ; ${component.name}` : "";
 					lines.push(`${reference} ${nodeLabels.join(" ")} ${value}${comment}`);
 				});
@@ -824,6 +852,31 @@
 					return "V";
 				}
 				return "X";
+			}
+
+			function resolveComponentValue(typeKey) {
+				if (!typeKey) {
+					return "";
+				}
+				const component = state.library[typeKey];
+				if (!component) {
+					return "";
+				}
+				const prefix = guessDesignatorPrefix(typeKey, component);
+				return component.defaultValue || component.value || defaultComponentValue(prefix);
+			}
+
+			function getPlacementValue(placement) {
+				if (!placement) {
+					return "";
+				}
+				if (typeof placement.value === "string") {
+					const trimmed = placement.value.trim();
+					if (trimmed) {
+						return trimmed;
+					}
+				}
+				return resolveComponentValue(placement.type) || "";
 			}
 
 			function makePinKey(placementId, pinId) {
@@ -998,6 +1051,21 @@
 				const drawY = instance.y - halfHeight;
 
 				ctx.drawImage(sprite, drawX, drawY, component.size.width, component.size.height);
+
+				const valueLabel = getPlacementValue(instance);
+				if (valueLabel) {
+					ctx.save();
+					const pixelFontSize = 14;
+					const pixelOffset = 0;
+					const fontSize = pixelFontSize / scale;
+					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					ctx.textAlign = "center";
+					ctx.textBaseline = "bottom";
+					ctx.fillStyle = "#0f172a";
+					const labelY = drawY - pixelOffset / scale;
+					ctx.fillText(valueLabel, instance.x, labelY);
+					ctx.restore();
+				}
 
 				ctx.save();
 				const placementId = ensurePlacementId(instance);

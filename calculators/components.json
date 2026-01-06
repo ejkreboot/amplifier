@@ -2,6 +2,7 @@
 	"resistor": {
 		"name": "Resistor",
 		"description": "Standard two-pin resistor symbol",
+		"defaultValue": "1k",
 		"size": { "width": 80, "height": 40 },
 		"pins": [
 			{ "id": "1", "name": "A", "position": { "x": 0, "y": 20 } },
@@ -12,6 +13,7 @@
 	"capacitor": {
 		"name": "Capacitor",
 		"description": "Parallel plate capacitor symbol",
+		"defaultValue": "1uF",
 		"size": { "width": 80, "height": 40 },
 		"pins": [
 			{ "id": "1", "name": "A", "position": { "x": 0, "y": 20 } },
