@@ -131,6 +131,7 @@
 				background: #fdfdfd;
 				border: 1px solid #cfcfcf;
 				touch-action: none;
+				cursor: crosshair;
 			}
 
 			.status-line {
@@ -516,20 +517,17 @@
 					y: snapToGrid(point.y),
 				};
 				const prev = state.pointerWorld;
-				if (!prev || prev.x !== snappedPoint.x || prev.y !== snappedPoint.y) {
+				const changed = !prev || prev.x !== snappedPoint.x || prev.y !== snappedPoint.y;
+				if (changed) {
 					state.pointerWorld = snappedPoint;
-					if (isWireMode() && state.pendingWire) {
-						requestRender();
-					}
+					requestRender();
 				}
 			}
 
 			function clearPointerWorld() {
 				if (state.pointerWorld) {
 					state.pointerWorld = null;
-					if (isWireMode() && state.pendingWire) {
-						requestRender();
-					}
+					requestRender();
 				}
 			}
 
@@ -1121,6 +1119,7 @@
 				ctx.scale(scale, scale);
 				ctx.translate(-state.panX, -state.panY);
 				drawGrid(scale);
+				drawCrosshairGuides(scale);
 				drawWires(scale);
 				state.placements.forEach((instance) => drawComponent(instance, scale));
 				ctx.restore();
@@ -1147,6 +1146,28 @@
 					ctx.moveTo(left - GRID_SIZE, y);
 					ctx.lineTo(right + GRID_SIZE, y);
 				}
+				ctx.stroke();
+				ctx.restore();
+			}
+
+			function drawCrosshairGuides(scale) {
+				// Draw CAD-style crosshair guides that span the visible canvas.
+				if (!state.pointerWorld) {
+					return;
+				}
+				const left = state.panX;
+				const top = state.panY;
+				const right = left + canvas.width / scale;
+				const bottom = top + canvas.height / scale;
+				ctx.save();
+				ctx.strokeStyle = "rgba(15, 23, 42, 0.4)";
+				ctx.setLineDash([]);
+				ctx.lineWidth = 0.15 / scale;
+				ctx.beginPath();
+				ctx.moveTo(left, state.pointerWorld.y);
+				ctx.lineTo(right, state.pointerWorld.y);
+				ctx.moveTo(state.pointerWorld.x, top);
+				ctx.lineTo(state.pointerWorld.x, bottom);
 				ctx.stroke();
 				ctx.restore();
 			}
