@@ -237,7 +237,6 @@
 				pointerWorld: null,
 				hoverPlacementId: null,
 				netlistText: "",
-				placementReferences: new Map(),
 			};
 
 			document.addEventListener("DOMContentLoaded", () => {
@@ -582,35 +581,16 @@
 			function updatePan(event) {
 				if (!state.panning) {
 					return;
-					state.placementReferences = new Map();
 				}
 				const metrics = getCanvasMetrics();
 				const deltaX = (event.clientX - state.panning.startX) * metrics.scaleX;
-				const placementReferences = computePlacementReferences();
-				state.placementReferences = placementReferences;
-				state.netlistText = buildNetlistText(placementReferences);
+				const deltaY = (event.clientY - state.panning.startY) * metrics.scaleY;
 				state.panX = state.panning.panX - deltaX / state.zoom;
 				state.panY = state.panning.panY - deltaY / state.zoom;
-
-			function computePlacementReferences() {
-				const references = new Map();
-				const prefixCounters = new Map();
-				state.placements.forEach((placement) => {
-					const component = state.library[placement.type];
-					if (!component) {
-						return;
-					}
-					const placementId = ensurePlacementId(placement);
-					const prefix = guessDesignatorPrefix(placement.type, component);
-					const nextIndex = (prefixCounters.get(prefix) || 0) + 1;
-					prefixCounters.set(prefix, nextIndex);
-					references.set(placementId, `${prefix}${nextIndex}`);
-				});
-				return references;
+				requestRender();
 			}
 
-			function buildNetlistText(referenceMap) {
-
+			function endPan(pointerId) {
 				if (pointerId === state.panPointerId && typeof canvas.releasePointerCapture === "function") {
 					canvas.releasePointerCapture(state.panPointerId);
 				}
@@ -618,7 +598,10 @@
 				state.panPointerId = null;
 			}
 
-					const reference = referenceMap?.get(placementId) || "X?";
+			function handlePointerMove(event) {
+				if (state.panPointerId === event.pointerId && state.panning) {
+					updatePan(event);
+					updatePointerWorldFromEvent(event);
 					return;
 				}
 
