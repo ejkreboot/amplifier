@@ -172,6 +172,7 @@
 				<div class="palette" id="componentPalette"></div>
 				<div class="tool-actions">
 					<button type="button" id="wireToolToggle">Wire Tool</button>
+					<button type="button" id="deleteToolToggle">Delete Tool</button>
 				</div>
 				<p class="status-line">Click inside the canvas to place the active component. Toggle the wire tool to connect pins. Grid size: 20px.</p>
 				<label class="zoom-control" for="zoomControl">
@@ -202,6 +203,7 @@
 			const ZOOM_SENSITIVITY = 0.0015;
 			const TOOL_PLACE = "place";
 			const TOOL_WIRE = "wire";
+			const TOOL_DELETE = "delete";
 			const PIN_HIT_RADIUS = 10;
 			const canvas = document.getElementById("editorCanvas");
 			const ctx = canvas.getContext("2d");
@@ -209,6 +211,7 @@
 			const zoomControl = document.getElementById("zoomControl");
 			const zoomValue = document.getElementById("zoomValue");
 			const wireToolToggle = document.getElementById("wireToolToggle");
+			const deleteToolToggle = document.getElementById("deleteToolToggle");
 			const netlistOutput = document.getElementById("netlistOutput");
 
 			const state = {
@@ -250,6 +253,10 @@
 				if (wireToolToggle) {
 					wireToolToggle.addEventListener("click", toggleWireTool);
 					updateWireToggleUI();
+				}
+				if (deleteToolToggle) {
+					deleteToolToggle.addEventListener("click", toggleDeleteTool);
+					updateDeleteToggleUI();
 				}
 				document.addEventListener("keydown", handleKeyDown, true);
 				document.addEventListener("keyup", handleKeyUp, true);
@@ -313,6 +320,10 @@
 				setActiveTool(isWireMode() ? TOOL_PLACE : TOOL_WIRE);
 			}
 
+			function toggleDeleteTool() {
+				setActiveTool(isDeleteMode() ? TOOL_PLACE : TOOL_DELETE);
+			}
+
 			function setActiveTool(nextTool) {
 				if (state.activeTool === nextTool) {
 					return;
@@ -322,6 +333,7 @@
 					state.pendingWire = null;
 				}
 				updateWireToggleUI();
+				updateDeleteToggleUI();
 				requestRender();
 			}
 
@@ -338,8 +350,25 @@
 				}
 			}
 
+			function updateDeleteToggleUI() {
+				if (!deleteToolToggle) {
+					return;
+				}
+				if (isDeleteMode()) {
+					deleteToolToggle.classList.add("active");
+					deleteToolToggle.textContent = "Delete Tool (On)";
+				} else {
+					deleteToolToggle.classList.remove("active");
+					deleteToolToggle.textContent = "Delete Tool";
+				}
+			}
+
 			function isWireMode() {
 				return state.activeTool === TOOL_WIRE;
+			}
+
+			function isDeleteMode() {
+				return state.activeTool === TOOL_DELETE;
 			}
 
 			function handlePointerDown(event) {
@@ -358,6 +387,11 @@
 				}
 
 				const point = getCanvasCoordinates(event);
+				if (isDeleteMode()) {
+					handleDeletePointerDown(point);
+					event.preventDefault();
+					return;
+				}
 				if (isWireMode()) {
 					handleWirePointerDown(point);
 					event.preventDefault();
@@ -403,6 +437,9 @@
 			function handleWirePointerDown(point) {
 				const hit = findPinAt(point);
 				if (!hit) {
+					if (state.pendingWire) {
+						addPendingWireWaypoint(point);
+					}
 					return;
 				}
 				const placementId = ensurePlacementId(hit.placement);
@@ -411,7 +448,7 @@
 					pinId: hit.pin.id,
 				};
 				if (!state.pendingWire) {
-					state.pendingWire = { from: targetRef };
+					state.pendingWire = { from: targetRef, waypoints: [] };
 					requestRender();
 					return;
 				}
@@ -423,12 +460,33 @@
 					requestRender();
 					return;
 				}
-				const newWire = createWireBetween(state.pendingWire.from, targetRef);
+				const newWire = createWireBetween(
+					state.pendingWire.from,
+					targetRef,
+					state.pendingWire.waypoints
+				);
 				if (newWire) {
 					state.wires.push(newWire);
 					updateNetlist();
 				}
 				state.pendingWire = null;
+				requestRender();
+			}
+
+			function addPendingWireWaypoint(point) {
+				if (!state.pendingWire) {
+					return;
+				}
+				const snapped = {
+					x: snapToGrid(point.x),
+					y: snapToGrid(point.y),
+				};
+				const waypoints = state.pendingWire.waypoints || (state.pendingWire.waypoints = []);
+				const last = waypoints[waypoints.length - 1];
+				if (last && last.x === snapped.x && last.y === snapped.y) {
+					return;
+				}
+				waypoints.push(snapped);
 				requestRender();
 			}
 
@@ -630,6 +688,64 @@
 				return null;
 			}
 
+			function findWireAt(point) {
+				const threshold = 8;
+				for (let index = state.wires.length - 1; index >= 0; index -= 1) {
+					const wire = state.wires[index];
+					const path = wire?.path || [];
+					for (let i = 0; i < path.length - 1; i += 1) {
+						const start = path[i];
+						const end = path[i + 1];
+						if (!start || !end) {
+							continue;
+						}
+						const distance = distancePointToSegment(point, start, end);
+						if (distance <= threshold) {
+							return index;
+						}
+					}
+				}
+				return -1;
+			}
+
+			function distancePointToSegment(point, start, end) {
+				const dx = end.x - start.x;
+				const dy = end.y - start.y;
+				if (dx === 0 && dy === 0) {
+					return Math.hypot(point.x - start.x, point.y - start.y);
+				}
+				const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy);
+				const clampedT = clamp(t, 0, 1);
+				const closestX = start.x + clampedT * dx;
+				const closestY = start.y + clampedT * dy;
+				return Math.hypot(point.x - closestX, point.y - closestY);
+			}
+
+			function handleDeletePointerDown(point) {
+				const wireIndex = findWireAt(point);
+				if (wireIndex !== -1) {
+					state.wires.splice(wireIndex, 1);
+					updateNetlist();
+					requestRender();
+					return;
+				}
+				const placementIndex = findPlacementAt(point);
+				if (placementIndex === -1) {
+					return;
+				}
+				const [placement] = state.placements.splice(placementIndex, 1);
+				const removedId = placement?.id;
+				if (removedId) {
+					state.wires = state.wires.filter((wire) => {
+						return (
+							wire.from.placementId !== removedId && wire.to.placementId !== removedId
+						);
+					});
+				}
+				updateNetlist();
+				requestRender();
+			}
+
 			function getPinWorldPosition(placement, pin) {
 				const component = state.library[placement.type];
 				if (!component || !pin) {
@@ -674,14 +790,17 @@
 				return getPinWorldPosition(placement, pin);
 			}
 
-			function createWireBetween(fromRef, toRef) {
+			function createWireBetween(fromRef, toRef, waypoints = []) {
 				if (!fromRef || !toRef) {
 					return null;
 				}
 				if (fromRef.placementId === toRef.placementId && fromRef.pinId === toRef.pinId) {
 					return null;
 				}
-				const path = buildWirePath(fromRef, toRef);
+				const normalizedWaypoints = Array.isArray(waypoints)
+					? waypoints.map((point) => ({ x: point.x, y: point.y }))
+					: [];
+				const path = buildWirePath(fromRef, toRef, normalizedWaypoints);
 				if (!path) {
 					return null;
 				}
@@ -689,15 +808,19 @@
 					id: state.nextWireId++,
 					from: { ...fromRef },
 					to: { ...toRef },
+					waypoints: normalizedWaypoints.length ? normalizedWaypoints : null,
 					path,
 				};
 			}
 
-			function buildWirePath(fromRef, toRef) {
+			function buildWirePath(fromRef, toRef, waypoints) {
 				const startPoint = getPinPositionFromRef(fromRef);
 				const endPoint = getPinPositionFromRef(toRef);
 				if (!startPoint || !endPoint) {
 					return null;
+				}
+				if (Array.isArray(waypoints) && waypoints.length) {
+					return buildPolylinePath([startPoint, ...waypoints, endPoint]);
 				}
 				return buildManhattanPath(startPoint, endPoint);
 			}
@@ -723,6 +846,10 @@
 				if (!originPoint) {
 					return null;
 				}
+				const waypoints = Array.isArray(state.pendingWire.waypoints) ? state.pendingWire.waypoints : [];
+				if (waypoints.length) {
+					return buildPolylinePath([originPoint, ...waypoints, state.pointerWorld]);
+				}
 				return buildManhattanPath(originPoint, state.pointerWorld);
 			}
 
@@ -732,12 +859,30 @@
 				}
 				state.wires.forEach((wire) => {
 					if (wire.from.placementId === placementId || wire.to.placementId === placementId) {
+						wire.waypoints = null;
 						const nextPath = buildWirePath(wire.from, wire.to);
 						if (nextPath) {
 							wire.path = nextPath;
 						}
 					}
 				});
+			}
+
+			function buildPolylinePath(points) {
+				if (!Array.isArray(points) || points.length < 2) {
+					return null;
+				}
+				const path = [{ x: points[0].x, y: points[0].y }];
+				for (let i = 1; i < points.length; i += 1) {
+					const segment = buildManhattanPath(points[i - 1], points[i]);
+					if (!segment || segment.length < 2) {
+						return null;
+					}
+					for (let j = 1; j < segment.length; j += 1) {
+						path.push(segment[j]);
+					}
+				}
+				return path;
 			}
 
 			function updateNetlist() {
