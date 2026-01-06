@@ -235,7 +235,9 @@
 				activeTool: TOOL_PLACE,
 				pendingWire: null,
 				pointerWorld: null,
+				hoverPlacementId: null,
 				netlistText: "",
+				placementReferences: new Map(),
 			};
 
 			document.addEventListener("DOMContentLoaded", () => {
@@ -388,6 +390,7 @@
 				}
 
 				const point = getCanvasCoordinates(event);
+				updateHoverPlacement(point);
 				if (isDeleteMode()) {
 					handleDeletePointerDown(point);
 					event.preventDefault();
@@ -429,7 +432,9 @@
 					x: snapped.x,
 					y: snapped.y,
 					value: resolveComponentValue(state.selected),
+					rotation: 0,
 				});
+				state.hoverPlacementId = placementId;
 
 				updateNetlist();
 				requestRender();
@@ -505,6 +510,7 @@
 			function updatePointerWorldFromEvent(event) {
 				const point = getCanvasCoordinates(event);
 				updatePointerWorld(point);
+				updateHoverPlacement(point);
 				return point;
 			}
 
@@ -531,6 +537,33 @@
 				}
 			}
 
+			function updateHoverPlacement(point) {
+				if (!point) {
+					clearHoverPlacement();
+					return;
+				}
+				const hitIndex = findPlacementAt(point);
+				if (hitIndex === -1) {
+					clearHoverPlacement();
+					return;
+				}
+				const placement = state.placements[hitIndex];
+				if (!placement) {
+					clearHoverPlacement();
+					return;
+				}
+				const placementId = ensurePlacementId(placement);
+				if (state.hoverPlacementId !== placementId) {
+					state.hoverPlacementId = placementId;
+				}
+			}
+
+			function clearHoverPlacement() {
+				if (state.hoverPlacementId !== null) {
+					state.hoverPlacementId = null;
+				}
+			}
+
 			function beginPan(event) {
 				state.panning = {
 					pointerId: event.pointerId,
@@ -549,16 +582,35 @@
 			function updatePan(event) {
 				if (!state.panning) {
 					return;
+					state.placementReferences = new Map();
 				}
 				const metrics = getCanvasMetrics();
 				const deltaX = (event.clientX - state.panning.startX) * metrics.scaleX;
-				const deltaY = (event.clientY - state.panning.startY) * metrics.scaleY;
+				const placementReferences = computePlacementReferences();
+				state.placementReferences = placementReferences;
+				state.netlistText = buildNetlistText(placementReferences);
 				state.panX = state.panning.panX - deltaX / state.zoom;
 				state.panY = state.panning.panY - deltaY / state.zoom;
-				requestRender();
+
+			function computePlacementReferences() {
+				const references = new Map();
+				const prefixCounters = new Map();
+				state.placements.forEach((placement) => {
+					const component = state.library[placement.type];
+					if (!component) {
+						return;
+					}
+					const placementId = ensurePlacementId(placement);
+					const prefix = guessDesignatorPrefix(placement.type, component);
+					const nextIndex = (prefixCounters.get(prefix) || 0) + 1;
+					prefixCounters.set(prefix, nextIndex);
+					references.set(placementId, `${prefix}${nextIndex}`);
+				});
+				return references;
 			}
 
-			function endPan(pointerId) {
+			function buildNetlistText(referenceMap) {
+
 				if (pointerId === state.panPointerId && typeof canvas.releasePointerCapture === "function") {
 					canvas.releasePointerCapture(state.panPointerId);
 				}
@@ -566,15 +618,13 @@
 				state.panPointerId = null;
 			}
 
-			function handlePointerMove(event) {
-				if (state.panPointerId === event.pointerId && state.panning) {
-					updatePan(event);
-					updatePointerWorldFromEvent(event);
+					const reference = referenceMap?.get(placementId) || "X?";
 					return;
 				}
 
 				const point = getCanvasCoordinates(event);
 				updatePointerWorld(point);
+				updateHoverPlacement(point);
 
 				if (!state.dragging || event.pointerId !== state.dragPointerId) {
 					return;
@@ -615,6 +665,7 @@
 
 			function handlePointerLeave() {
 				clearPointerWorld();
+				clearHoverPlacement();
 			}
 
 			function handleDoubleClick(event) {
@@ -644,6 +695,9 @@
 			}
 
 			function findPlacementAt(point) {
+				if (!point) {
+					return -1;
+				}
 				// Traverse in reverse draw order so the topmost instance wins the hit test.
 				for (let i = state.placements.length - 1; i >= 0; i -= 1) {
 					const placement = state.placements[i];
@@ -651,17 +705,29 @@
 					if (!component) {
 						continue;
 					}
-					const halfWidth = component.size.width / 2;
-					const halfHeight = component.size.height / 2;
-					const left = placement.x - halfWidth;
-					const right = placement.x + halfWidth;
-					const top = placement.y - halfHeight;
-					const bottom = placement.y + halfHeight;
-					if (point.x >= left && point.x <= right && point.y >= top && point.y <= bottom) {
+					if (isPointInsidePlacement(point, placement, component)) {
 						return i;
 					}
 				}
 				return -1;
+			}
+
+			function isPointInsidePlacement(point, placement, component) {
+				if (!point || !placement || !component) {
+					return false;
+				}
+				const halfWidth = component.size.width / 2;
+				const halfHeight = component.size.height / 2;
+				const localPoint = worldPointToLocal(point, placement);
+				if (!localPoint) {
+					return false;
+				}
+				return (
+					localPoint.x >= -halfWidth &&
+					localPoint.x <= halfWidth &&
+					localPoint.y >= -halfHeight &&
+					localPoint.y <= halfHeight
+				);
 			}
 
 			function findPinAt(point) {
@@ -734,6 +800,9 @@
 				const [placement] = state.placements.splice(placementIndex, 1);
 				const removedId = placement?.id;
 				if (removedId) {
+					if (state.hoverPlacementId === removedId) {
+						state.hoverPlacementId = null;
+					}
 					state.wires = state.wires.filter((wire) => {
 						return (
 							wire.from.placementId !== removedId && wire.to.placementId !== removedId
@@ -746,19 +815,45 @@
 
 			function getPinWorldPosition(placement, pin) {
 				const component = state.library[placement.type];
-				if (!component || !pin) {
+				if (!component || !pin || !component.size || !pin.position) {
 					return null;
 				}
-				const halfWidth = component.size.width / 2;
-				const halfHeight = component.size.height / 2;
+				const localX = pin.position.x - component.size.width / 2;
+				const localY = pin.position.y - component.size.height / 2;
+				const rotationRadians = toRadians(getPlacementRotation(placement));
+				const rotated = rotatePoint(localX, localY, rotationRadians);
 				return {
-					x: placement.x - halfWidth + pin.position.x,
-					y: placement.y - halfHeight + pin.position.y,
+					x: placement.x + rotated.x,
+					y: placement.y + rotated.y,
 				};
 			}
 
 			function findPlacementById(placementId) {
 				return state.placements.find((placement) => placement.id === placementId) || null;
+			}
+
+			function rotateHoveredPlacement() {
+				if (!state.hoverPlacementId) {
+					return false;
+				}
+				const placement = findPlacementById(state.hoverPlacementId);
+				if (!placement) {
+					state.hoverPlacementId = null;
+					return false;
+				}
+				rotatePlacement(placement, 90);
+				return true;
+			}
+
+			function rotatePlacement(placement, deltaDegrees = 90) {
+				if (!placement) {
+					return;
+				}
+				const nextRotation = normalizeRotation(getPlacementRotation(placement) + deltaDegrees);
+				placement.rotation = nextRotation;
+				const placementId = ensurePlacementId(placement);
+				rerouteWiresForPlacement(placementId);
+				requestRender();
 			}
 
 			function ensurePlacementId(placement) {
@@ -1213,32 +1308,39 @@
 
 				const halfWidth = component.size.width / 2;
 				const halfHeight = component.size.height / 2;
-				const drawX = instance.x - halfWidth;
-				const drawY = instance.y - halfHeight;
-
-				ctx.drawImage(sprite, drawX, drawY, component.size.width, component.size.height);
-
+				const rotationRadians = toRadians(getPlacementRotation(instance));
+				const localDrawX = -halfWidth;
+				const localDrawY = -halfHeight;
 				const valueLabel = getPlacementValue(instance);
+				let labelWorldPosition = null;
 				if (valueLabel) {
-					ctx.save();
-					const pixelFontSize = 14;
-					const pixelOffset = 0;
-					const fontSize = pixelFontSize / scale;
-					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
-					ctx.textAlign = "center";
-					ctx.textBaseline = "bottom";
-					ctx.fillStyle = "#0f172a";
-					const labelY = drawY - pixelOffset / scale;
-					ctx.fillText(valueLabel, instance.x, labelY);
-					ctx.restore();
+					const minOffset = 6;
+					const maxOffset = 14;
+					const orientationFactor = Math.abs(Math.sin(rotationRadians));
+					const pixelOffset = minOffset + (maxOffset - minOffset) * orientationFactor;
+					const labelLocal = { x: 0, y: localDrawY - pixelOffset / scale };
+					const rotatedOffset = rotationRadians
+						? rotatePoint(labelLocal.x, labelLocal.y, rotationRadians)
+						: labelLocal;
+					labelWorldPosition = {
+						x: instance.x + rotatedOffset.x,
+						y: instance.y + rotatedOffset.y,
+					};
 				}
 
 				ctx.save();
+				ctx.translate(instance.x, instance.y);
+				if (rotationRadians !== 0) {
+					ctx.rotate(rotationRadians);
+				}
+				ctx.drawImage(sprite, localDrawX, localDrawY, component.size.width, component.size.height);
+
 				const placementId = ensurePlacementId(instance);
 				const pinRadius = 4 / scale;
-				component.pins.forEach((pin) => {
-					const pinX = drawX + pin.position.x;
-					const pinY = drawY + pin.position.y;
+				const pins = component.pins || [];
+				pins.forEach((pin) => {
+					const pinX = localDrawX + pin.position.x;
+					const pinY = localDrawY + pin.position.y;
 					const isActivePin =
 						state.pendingWire &&
 						state.pendingWire.from.placementId === placementId &&
@@ -1249,6 +1351,18 @@
 					ctx.fill();
 				});
 				ctx.restore();
+
+				if (valueLabel && labelWorldPosition) {
+					ctx.save();
+					const pixelFontSize = 14;
+					const fontSize = pixelFontSize / scale;
+					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					ctx.textAlign = "center";
+					ctx.textBaseline = "bottom";
+					ctx.fillStyle = "#0f172a";
+					ctx.fillText(valueLabel, labelWorldPosition.x, labelWorldPosition.y);
+					ctx.restore();
+				}
 			}
 
 			function handleKeyDown(event) {
@@ -1259,6 +1373,13 @@
 					}
 					if (isWireMode()) {
 						setActiveTool(TOOL_PLACE);
+					}
+					return;
+				}
+				if ((event.key === "r" || event.key === "R") && !shouldIgnoreKey(event)) {
+					const rotated = rotateHoveredPlacement();
+					if (rotated) {
+						event.preventDefault();
 					}
 					return;
 				}
@@ -1298,6 +1419,44 @@
 				return {
 					x: state.panX + canvasX / state.zoom,
 					y: state.panY + canvasY / state.zoom,
+				};
+			}
+
+			function worldPointToLocal(point, placement) {
+				if (!point || !placement) {
+					return null;
+				}
+				const dx = point.x - placement.x;
+				const dy = point.y - placement.y;
+				const rotationRadians = toRadians(getPlacementRotation(placement));
+				return rotatePoint(dx, dy, -rotationRadians);
+			}
+
+			function getPlacementRotation(placement) {
+				if (!placement) {
+					return 0;
+				}
+				return Number.isFinite(placement.rotation) ? placement.rotation : 0;
+			}
+
+			function normalizeRotation(value) {
+				if (!Number.isFinite(value)) {
+					return 0;
+				}
+				const mod = value % 360;
+				return mod < 0 ? mod + 360 : mod;
+			}
+
+			function toRadians(degrees) {
+				return (degrees * Math.PI) / 180;
+			}
+
+			function rotatePoint(x, y, angleRadians) {
+				const cosA = Math.cos(angleRadians);
+				const sinA = Math.sin(angleRadians);
+				return {
+					x: x * cosA - y * sinA,
+					y: x * sinA + y * cosA,
 				};
 			}
 
