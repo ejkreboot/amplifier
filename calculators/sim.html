@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Circuit Editor Proof of Concept</title>
+		<style>
+			:root {
+				font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+				color: #111;
+				background-color: #f3f3f3;
+				line-height: 1.4;
+			}
+
+			body {
+				margin: 0;
+				padding: 0;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+			}
+
+			header {
+				padding: 1rem 1.5rem;
+				background: #fff;
+				border-bottom: 1px solid #dcdcdc;
+			}
+
+			header h1 {
+				margin: 0;
+				font-size: 1.25rem;
+			}
+
+			main {
+				flex: 1;
+				display: flex;
+				gap: 1rem;
+				padding: 1rem;
+			}
+
+			.panel {
+				width: 230px;
+				background: #fff;
+				border: 1px solid #d0d0d0;
+				border-radius: 8px;
+				padding: 1rem;
+				display: flex;
+				flex-direction: column;
+				gap: 0.75rem;
+			}
+
+			.panel h2 {
+				font-size: 1rem;
+				margin: 0;
+			}
+
+			.palette {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			.palette button {
+				border: 1px solid #c0c0c0;
+				border-radius: 6px;
+				padding: 0.4rem 0.6rem;
+				font-size: 0.95rem;
+				text-align: left;
+				background: #fafafa;
+				cursor: pointer;
+			}
+
+			.palette button.active {
+				border-color: #2563eb;
+				color: #0f172a;
+				background: #e0ecff;
+				font-weight: 600;
+			}
+
+			.zoom-control {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-size: 0.9rem;
+			}
+
+			.zoom-control input {
+				flex: 1;
+			}
+
+			.canvas-wrapper {
+				flex: 1;
+				background: #fff;
+				border: 1px solid #d0d0d0;
+				border-radius: 8px;
+				padding: 0.5rem;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+			}
+
+			canvas {
+				width: 100%;
+				height: 100%;
+				max-width: 1000px;
+				max-height: 700px;
+				border-radius: 4px;
+				background: #fdfdfd;
+				border: 1px solid #cfcfcf;
+				touch-action: none;
+			}
+
+			.status-line {
+				font-size: 0.85rem;
+				color: #555;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>Circuit Editor Proof of Concept</h1>
+		</header>
+		<main>
+			<section class="panel">
+				<h2>Components</h2>
+				<div class="palette" id="componentPalette"></div>
+				<p class="status-line">Click inside the canvas to place the active component. Grid size: 25px.</p>
+				<label class="zoom-control" for="zoomControl">
+					<span>Zoom</span>
+					<input type="range" id="zoomControl" min="0.5" max="2" step="0.1" value="1" />
+					<output id="zoomValue" for="zoomControl">100%</output>
+				</label>
+			</section>
+			<div class="canvas-wrapper">
+				<canvas id="editorCanvas" width="1000" height="650" aria-label="Circuit editor canvas"></canvas>
+			</div>
+		</main>
+
+		<script>
+			const GRID_SIZE = 20;
+			const canvas = document.getElementById("editorCanvas");
+			const ctx = canvas.getContext("2d");
+			const palette = document.getElementById("componentPalette");
+			const zoomControl = document.getElementById("zoomControl");
+			const zoomValue = document.getElementById("zoomValue");
+
+			const state = {
+				library: {},
+				sprites: {},
+				placements: [],
+				selected: null,
+				ready: false,
+				dragging: null,
+				activePointerId: null,
+				zoom: 1,
+			};
+
+			document.addEventListener("DOMContentLoaded", () => {
+				loadLibrary();
+				canvas.addEventListener("pointerdown", handlePointerDown);
+				canvas.addEventListener("pointermove", handlePointerMove);
+				canvas.addEventListener("pointerup", handlePointerUp);
+				canvas.addEventListener("pointercancel", handlePointerUp);
+				if (zoomControl) {
+					zoomControl.addEventListener("input", handleZoomInput);
+				}
+			});
+
+			function handleZoomInput(event) {
+				const nextZoom = Number(event.target.value);
+				if (!Number.isFinite(nextZoom) || nextZoom <= 0) {
+					return;
+				}
+				state.zoom = nextZoom;
+				if (zoomValue) {
+					zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+				}
+				requestRender();
+			}
+
+			async function loadLibrary() {
+				try {
+					const response = await fetch("components.json");
+					if (!response.ok) {
+						throw new Error(`Failed to load library: ${response.status}`);
+					}
+
+					const library = await response.json();
+					state.library = library;
+
+					const entries = Object.entries(library);
+					if (entries.length === 0) {
+						console.warn("Component library is empty.");
+						return;
+					}
+
+					await Promise.all(entries.map(([key, component]) => buildSprite(key, component)));
+					state.selected = entries[0][0];
+					state.ready = true;
+					updatePalette();
+					requestRender();
+				} catch (error) {
+					console.error(error);
+				}
+			}
+
+			function handlePointerDown(event) {
+				if (!state.ready) {
+					return;
+				}
+
+				const point = getCanvasCoordinates(event);
+				const hitIndex = findPlacementAt(point);
+				if (hitIndex !== -1) {
+					const hitPlacement = state.placements[hitIndex];
+					state.dragging = {
+						index: hitIndex,
+						offsetX: point.x - hitPlacement.x,
+						offsetY: point.y - hitPlacement.y,
+					};
+					state.activePointerId = event.pointerId;
+					if (typeof canvas.setPointerCapture === "function") {
+						canvas.setPointerCapture(event.pointerId);
+					}
+					event.preventDefault();
+					return;
+				}
+
+				if (!state.selected) {
+					return;
+				}
+				const snapped = {
+					x: snapToGrid(point.x),
+					y: snapToGrid(point.y),
+				};
+
+				state.placements.push({
+					type: state.selected,
+					x: snapped.x,
+					y: snapped.y,
+				});
+
+				requestRender();
+			}
+
+			function getCanvasCoordinates(event) {
+				const rect = canvas.getBoundingClientRect();
+				const scaleX = canvas.width / rect.width;
+				const scaleY = canvas.height / rect.height;
+				return {
+					x: ((event.clientX - rect.left) * scaleX) / state.zoom,
+					y: ((event.clientY - rect.top) * scaleY) / state.zoom,
+				};
+			}
+
+			function snapToGrid(value) {
+				return Math.round(value / GRID_SIZE) * GRID_SIZE;
+			}
+
+			function handlePointerMove(event) {
+				if (!state.dragging) {
+					return;
+				}
+
+				const point = getCanvasCoordinates(event);
+				const placement = state.placements[state.dragging.index];
+				if (!placement) {
+					return;
+				}
+
+				const nextX = snapToGrid(point.x - state.dragging.offsetX);
+				const nextY = snapToGrid(point.y - state.dragging.offsetY);
+				if (placement.x !== nextX || placement.y !== nextY) {
+					placement.x = nextX;
+					placement.y = nextY;
+					requestRender();
+				}
+			}
+
+			function handlePointerUp(event) {
+				if (!state.dragging || event.pointerId !== state.activePointerId) {
+					return;
+				}
+
+				if (state.activePointerId !== null && typeof canvas.releasePointerCapture === "function") {
+					canvas.releasePointerCapture(state.activePointerId);
+				}
+				state.dragging = null;
+				state.activePointerId = null;
+			}
+
+			function findPlacementAt(point) {
+				// Traverse in reverse draw order so the topmost instance wins the hit test.
+				for (let i = state.placements.length - 1; i >= 0; i -= 1) {
+					const placement = state.placements[i];
+					const component = state.library[placement.type];
+					if (!component) {
+						continue;
+					}
+					const halfWidth = component.size.width / 2;
+					const halfHeight = component.size.height / 2;
+					const left = placement.x - halfWidth;
+					const right = placement.x + halfWidth;
+					const top = placement.y - halfHeight;
+					const bottom = placement.y + halfHeight;
+					if (point.x >= left && point.x <= right && point.y >= top && point.y <= bottom) {
+						return i;
+					}
+				}
+				return -1;
+			}
+
+			function buildSprite(key, component) {
+				return new Promise((resolve, reject) => {
+					const img = new Image();
+					img.onload = () => {
+						state.sprites[key] = img;
+						resolve();
+					};
+					img.onerror = reject;
+					img.src = svgToDataUrl(component.svg);
+				});
+			}
+
+			function svgToDataUrl(svgString) {
+				const trimmed = svgString.trim();
+				const encoded = window.btoa(unescape(encodeURIComponent(trimmed)));
+				return `data:image/svg+xml;base64,${encoded}`;
+			}
+
+			function updatePalette() {
+				palette.innerHTML = "";
+				Object.entries(state.library).forEach(([key, component]) => {
+					const button = document.createElement("button");
+					button.type = "button";
+					button.textContent = component.name;
+					if (state.selected === key) {
+						button.classList.add("active");
+					}
+					button.addEventListener("click", () => {
+						state.selected = key;
+						updatePalette();
+					});
+					palette.appendChild(button);
+				});
+			}
+
+			let pendingFrame = null;
+			function requestRender() {
+				if (pendingFrame !== null) {
+					return;
+				}
+				pendingFrame = requestAnimationFrame(() => {
+					render();
+					pendingFrame = null;
+				});
+			}
+
+			function render() {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				const scale = state.zoom;
+				ctx.save();
+				ctx.scale(scale, scale);
+				const viewWidth = canvas.width / scale;
+				const viewHeight = canvas.height / scale;
+				drawGrid(viewWidth, viewHeight, scale);
+				state.placements.forEach((instance) => drawComponent(instance, scale));
+				ctx.restore();
+			}
+
+			function drawGrid(viewWidth, viewHeight, scale) {
+				ctx.save();
+				ctx.strokeStyle = "#99baaa";
+				ctx.setLineDash([1, 3]);
+				ctx.lineWidth = 0.5;
+				ctx.beginPath();
+				for (let x = 0; x <= viewWidth; x += GRID_SIZE) {
+					ctx.moveTo(x + 0.5, 0);
+					ctx.lineTo(x + 0.5, viewHeight);
+				}
+				for (let y = 0; y <= viewHeight; y += GRID_SIZE) {
+					ctx.moveTo(0, y + 0.5);
+					ctx.lineTo(viewWidth, y + 0.5);
+				}
+				ctx.stroke();
+				ctx.restore();
+			}
+
+			function drawComponent(instance, scale) {
+				const component = state.library[instance.type];
+				const sprite = state.sprites[instance.type];
+				if (!component || !sprite) {
+					return;
+				}
+
+				const halfWidth = component.size.width / 2;
+				const halfHeight = component.size.height / 2;
+				const drawX = instance.x - halfWidth;
+				const drawY = instance.y - halfHeight;
+
+				ctx.drawImage(sprite, drawX, drawY, component.size.width, component.size.height);
+
+				ctx.save();
+				ctx.fillStyle = "#2563eb";
+				const pinRadius = 4 / scale;
+				component.pins.forEach((pin) => {
+					const pinX = drawX + pin.position.x;
+					const pinY = drawY + pin.position.y;
+					ctx.beginPath();
+					ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
+					ctx.fill();
+				});
+				ctx.restore();
+			}
+		</script>
+	</body>
+</html>

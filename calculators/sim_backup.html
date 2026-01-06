@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPICE Netlist Visualizer</title>
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/elkjs@0.9.2/lib/elk.bundled.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        h2 {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        textarea {
+            width: 100%;
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            resize: none;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        #cy {
+            width: 100%;
+            height: 100%;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background: #ffffff;
+        }
+        
+        .info {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #2e7d32;
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .controls button {
+            flex: 1;
+            padding: 8px;
+            font-size: 14px;
+        }
+        
+        .stats {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <!-- SVG Symbol Definitions -->
+    <svg style="display: none;">
+        <defs>
+            <!-- Resistor -->
+            <symbol id="resistor" viewBox="0 0 80 30">
+                <path d="M 0,15 L 10,15 L 15,5 L 25,25 L 35,5 L 45,25 L 55,5 L 65,25 L 70,15 L 80,15" 
+                      stroke="black" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </symbol>
+            
+            <!-- Capacitor -->
+            <symbol id="capacitor" viewBox="0 0 60 40">
+                <line x1="0" y1="20" x2="25" y2="20" stroke="black" stroke-width="2.5"/>
+                <line x1="25" y1="5" x2="25" y2="35" stroke="black" stroke-width="3"/>
+                <line x1="35" y1="5" x2="35" y2="35" stroke="black" stroke-width="3"/>
+                <line x1="35" y1="20" x2="60" y2="20" stroke="black" stroke-width="2.5"/>
+            </symbol>
+            
+            <!-- Inductor -->
+            <symbol id="inductor" viewBox="0 0 80 30">
+                <path d="M 0,15 Q 5,15 5,10 T 10,15 Q 15,15 15,10 T 20,15 Q 25,15 25,10 T 30,15 Q 35,15 35,10 T 40,15 Q 45,15 45,10 T 50,15 L 60,15" 
+                      stroke="black" stroke-width="2.5" fill="none"/>
+            </symbol>
+            
+            <!-- Diode -->
+            <symbol id="diode" viewBox="0 0 60 40">
+                <line x1="0" y1="20" x2="20" y2="20" stroke="black" stroke-width="2.5"/>
+                <polygon points="20,8 20,32 40,20" fill="black" stroke="black" stroke-width="1.5"/>
+                <line x1="40" y1="8" x2="40" y2="32" stroke="black" stroke-width="3"/>
+                <line x1="40" y1="20" x2="60" y2="20" stroke="black" stroke-width="2.5"/>
+            </symbol>
+            
+            <!-- Voltage Source (Circle with + -) -->
+            <symbol id="vsource" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="20" stroke="black" stroke-width="2.5" fill="none"/>
+                <line x1="25" y1="15" x2="25" y2="35" stroke="black" stroke-width="2"/>
+                <line x1="15" y1="25" x2="35" y2="25" stroke="black" stroke-width="2"/>
+                <line x1="15" y1="25" x2="20" y2="25" stroke="black" stroke-width="2"/>
+            </symbol>
+            
+            <!-- Current Source -->
+            <symbol id="isource" viewBox="0 0 50 50">
+                <circle cx="25" cy="25" r="20" stroke="black" stroke-width="2.5" fill="none"/>
+                <line x1="15" y1="25" x2="35" y2="25" stroke="black" stroke-width="2"/>
+                <polygon points="30,20 35,25 30,30" fill="black"/>
+            </symbol>
+            
+            <!-- Ground Symbol -->
+            <symbol id="ground" viewBox="0 0 40 40">
+                <line x1="20" y1="0" x2="20" y2="15" stroke="black" stroke-width="2.5"/>
+                <line x1="5" y1="15" x2="35" y2="15" stroke="black" stroke-width="3"/>
+                <line x1="10" y1="22" x2="30" y2="22" stroke="black" stroke-width="2.5"/>
+                <line x1="15" y1="29" x2="25" y2="29" stroke="black" stroke-width="2"/>
+            </symbol>
+            
+            <!-- NPN Transistor -->
+            <symbol id="npn" viewBox="0 0 60 70">
+                <line x1="20" y1="20" x2="20" y2="50" stroke="black" stroke-width="3"/>
+                <line x1="0" y1="35" x2="20" y2="35" stroke="black" stroke-width="2.5"/>
+                <line x1="20" y1="25" x2="45" y2="10" stroke="black" stroke-width="2.5"/>
+                <line x1="20" y1="45" x2="45" y2="60" stroke="black" stroke-width="2.5"/>
+                <polygon points="38,55 45,60 42,50" fill="black"/>
+            </symbol>
+            
+            <!-- MOSFET -->
+            <symbol id="mosfet" viewBox="0 0 60 70">
+                <line x1="20" y1="15" x2="20" y2="55" stroke="black" stroke-width="3"/>
+                <line x1="0" y1="35" x2="15" y2="35" stroke="black" stroke-width="2.5"/>
+                <line x1="25" y1="20" x2="45" y2="10" stroke="black" stroke-width="2.5"/>
+                <line x1="25" y1="35" x2="45" y2="35" stroke="black" stroke-width="2.5"/>
+                <line x1="25" y1="50" x2="45" y2="60" stroke="black" stroke-width="2.5"/>
+                <line x1="45" y1="10" x2="45" y2="35" stroke="black" stroke-width="2.5"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <div class="container">
+        <div class="panel">
+            <h1>SPICE Netlist</h1>
+            <textarea id="netlist" placeholder="Paste your SPICE netlist here...">* Relay Coil Driver Circuit
+V1 VCC 0 DC 24
+R1 VCC N001 400
+D1 N001 0 D20V
+D2 N001 0 1N4004
+RCOIL N001 0 1600
+C1 N001 0 100n
+
+.model D20V D(Bv=20)
+.model 1N4004 D(Bv=400)</textarea>
+            <button onclick="parseAndVisualize()">Generate Schematic</button>
+            <div class="controls">
+                <button onclick="changeLayout('fcose')">fCoSE Layout</button>
+                <button onclick="changeLayout('circle')">Circle Layout</button>
+                <button onclick="changeLayout('layered')">Layered (Default)</button>
+                <button onclick="changeLayout('box')">Box Layout</button>
+                <button onclick="changeLayout('force')">Force;"></div>
+            <div id="stats" class="stats" style="display:none;"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>Schematic View</h2>
+            <div id="cy"></div>
+        </div>
+    </div>
+
+    <script>
+        let cy;
+        
+        function initCytoscape() {
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'label': 'data(label)',
+                            'text-valign': 'bottom',
+                            'text-halign': 'center',
+                            'text-margin-y': 8,
+                            'background-color': '#fff',
+                            'width': 'data(width)',
+                            'height': 'data(height)',
+                            'font-size': '11px',
+                            'color': '#333',
+                            'font-weight': '600',
+                            'border-width': 0
+                        }
+                    },
+                    {
+                        selector: 'node[type="net"]',
+                        style: {
+                            'shape': 'ellipse',
+                            'background-color': '#2196F3',
+                            'width': 8,
+                            'height': 8,
+                            'font-size': '10px',
+                            'color': '#333',
+                            'text-valign': 'top',
+                            'text-margin-y': 5,
+                            'border-width': 2,
+                            'border-color': '#1976D2'
+                        }
+                    },
+                    {
+                        selector: 'node[type="ground"]',
+                        style: {
+                            'background-image': 'data(symbol)',
+                            'background-fit': 'contain',
+                            'background-clip': 'none',
+                            'shape': 'rectangle',
+                            'width': 40,
+                            'height': 40
+                        }
+                    },
+                    {
+                        selector: 'node[type="component"]',
+                        style: {
+                            'shape': 'rectangle',
+                            'background-image': 'data(symbol)',
+                            'background-fit': 'contain',
+                            'background-clip': 'none',
+                            'width': 'data(width)',
+                            'height': 'data(height)'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#999',
+                            'target-arrow-color': '#999',
+                            'curve-style': 'bezier',
+                            'label': 'data(label)',
+                            'font-size': '10px',
+                            'text-rotation': 'autorotate',
+                            'text-background-color': '#fff',
+                            'text-background-opacity': 0.8,
+                            'text-background-padding': '3px'
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'fcose',
+                    quality: "default",
+                    randomize: false,
+                    animate: true,
+                    animationDuration: 1000,
+                    nodeSeparation: 100,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45,
+                    nestingFactor: 0.1,
+                    gravity: 0.25,
+                    numIter: 2500,
+                    tile: true,
+                    tilingPaddingVertical: 10,
+                    tilingPaddingHorizontal: 10
+                }
+            });
+        }
+        
+        function getComponentSymbol(type) {
+            const symbols = {
+                'R': { id: 'resistor', width: 80, height: 30 },
+                'C': { id: 'capacitor', width: 60, height: 40 },
+                'L': { id: 'inductor', width: 80, height: 30 },
+                'D': { id: 'diode', width: 60, height: 40 },
+                'V': { id: 'vsource', width: 50, height: 50 },
+                'I': { id: 'isource', width: 50, height: 50 },
+                'Q': { id: 'npn', width: 60, height: 70 },
+                'M': { id: 'mosfet', width: 60, height: 70 }
+            };
+            return symbols[type] || { id: 'resistor', width: 60, height: 40 };
+        }
+        
+        function getSVGDataURL(symbolId) {
+            const svg = document.querySelector(`symbol#${symbolId}`);
+            if (!svg) return null;
+            
+            const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            const viewBox = svg.getAttribute('viewBox');
+            svgElement.setAttribute('viewBox', viewBox);
+            svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            svgElement.innerHTML = svg.innerHTML;
+            
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgElement);
+            const encodedData = encodeURIComponent(svgString);
+            
+            return `data:image/svg+xml;charset=utf-8,${encodedData}`;
+        }
+        
+        function parseNetlist(netlistText) {
+            const lines = netlistText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('*'));
+            const components = [];
+            const models = {};
+            const nets = new Set();
+            
+            lines.forEach(line => {
+                // Skip model definitions for now, store them
+                if (line.startsWith('.model')) {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        models[parts[1]] = line;
+                    }
+                    return;
+                }
+                
+                // Skip other directives
+                if (line.startsWith('.')) {
+                    return;
+                }
+                
+                // Parse component line
+                const parts = line.split(/\s+/);
+                if (parts.length < 3) return;
+                
+                const name = parts[0];
+                const type = name[0].toUpperCase();
+                
+                // Extract nodes and value
+                let nodes = [];
+                let value = '';
+                
+                if (type === 'V' || type === 'I') {
+                    // Voltage/Current source: V1 n+ n- DC value
+                    nodes = [parts[1], parts[2]];
+                    value = parts.slice(3).join(' ');
+                } else if (type === 'R' || type === 'C' || type === 'L') {
+                    // R/L/C: R1 n1 n2 value
+                    nodes = [parts[1], parts[2]];
+                    value = parts[3] || '';
+                } else if (type === 'D') {
+                    // Diode: D1 n+ n- model
+                    nodes = [parts[1], parts[2]];
+                    value = parts[3] || 'D';
+                } else {
+                    // Generic: name n1 n2 ...
+                    nodes = parts.slice(1, 3);
+                    value = parts.slice(3).join(' ');
+                }
+                
+                nodes.forEach(net => nets.add(net));
+                
+                components.push({
+                    name,
+                    type,
+                    nodes,
+                    value
+                });
+            });
+            
+            return { components, nets: Array.from(nets), models };
+        }
+        
+        function createGraph(parsed) {
+            const elements = [];
+            
+            // Create nodes for nets
+            parsed.nets.forEach(net => {
+                if (net === '0') {
+                    // Ground node with symbol
+                    elements.push({
+                        data: {
+                            id: `net_${net}`,
+                            label: 'GND',
+                            type: 'ground',
+                            symbol: getSVGDataURL('ground'),
+                            width: 40,
+                            height: 40
+                        }
+                    });
+                } else {
+                    // Regular net node (junction point)
+                    elements.push({
+                        data: {
+                            id: `net_${net}`,
+                            label: net,
+                            type: 'net',
+                            width: 8,
+                            height: 8
+                        }
+                    });
+                }
+            });
+            
+            // Create nodes for components
+            parsed.components.forEach(comp => {
+                const symbolInfo = getComponentSymbol(comp.type);
+                const svgURL = getSVGDataURL(symbolInfo.id);
+                
+                elements.push({
+                    data: {
+                        id: comp.name,
+                        label: `${comp.name}: ${comp.value}`,
+                        type: 'component',
+                        symbol: svgURL,
+                        width: symbolInfo.width,
+                        height: symbolInfo.height
+                    }
+                });
+                
+                // Create edges from component to its nets
+                comp.nodes.forEach((net, idx) => {
+                    elements.push({
+                        data: {
+                            id: `${comp.name}_${net}_${idx}`,
+                            source: comp.name,
+                            target: `net_${net}`,
+                            label: idx === 0 ? '+' : (idx === 1 ? '-' : '')
+                        }
+                    });
+                });
+            });
+            
+            return elements;
+        }
+        
+        function parseAndVisualize() {
+            const netlistText = document.getElementById('netlist').value;
+            const infoDiv = document.getElementById('info');
+            const statsDiv = document.getElementById('stats');
+            
+            try {
+                const parsed = parseNetlist(netlistText);
+                const elements = createGraph(parsed);
+                
+                if (!cy) {
+                    initCytoscape();
+                }
+                
+                cy.elements().remove();
+                cy.add(elements);
+                cy.layout({
+                    name: 'fcose',
+                    quality: "default",
+                    randomize: false,
+                    animate: true,
+                    animationDuration: 1000,
+                    nodeSeparation: 100,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45,
+                    nestingFactor: 0.1,
+                    gravity: 0.25,
+                    numIter: 2500,
+                    tile: true
+                }).run();
+                
+                // Show stats
+                infoDiv.style.display = 'block';
+                infoDiv.className = 'info';
+                infoDiv.innerHTML = '✓ Netlist parsed successfully!';
+                
+                statsDiv.style.display = 'block';
+                statsDiv.innerHTML = `Components: ${parsed.components.length}<br>Nets: ${parsed.nets.length}<br>Models: ${Object.keys(parsed.models).length}`;
+                
+            } catch (error) {
+                infoDiv.style.display = 'block';
+                infoDiv.className = 'info error';
+                infoDiv.innerHTML = `✗ Error: ${error.message}`;
+                statsDiv.style.display = 'none';
+            }
+        }
+        
+        function changeLayout(layoutName) {
+            if (!cy) return;
+            
+            const layoutOptions = {
+                fcose: {
+                    name: 'fcose',
+                    quality: "default",
+                    randomize: false,
+                    animate: true,
+                    animationDuration: 1000,
+                    nodeSeparation: 100,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45
+                },
+                circle: {
+                    name: 'circle',
+                    animate: true,
+                    animationDuration: 1000
+                },
+                grid: {
+                    name: 'grid',
+                    animate: true,
+                    animationDuration: 1000,
+                    rows: undefined,
+                    cols: undefined
+                }
+            };
+            
+            cy.layout(layoutOptions[layoutName] || layoutOptions.fcose).run();
+        }
+        
+        // Initialize on load
+        window.onload = function() {
+            initCytoscape();
+            parseAndVisualize();
+        };
+    </script>
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'label': 'data(label)',
+                            'text-valign': 'bottom',
+                            'text-halign': 'center',
+                            'text-margin-y': 8,
+                            'background-color': '#fff',
+                            'width': 'data(width)',
+                            'height': 'data(height)',
+                            'font-size': '11px',
+                            'color': '#333',
+                            'font-weight': '600',
+                            'border-width': 0
+                        }
+                    },
+                    {
+                        selector: 'node[type="net"]',
+                        style: {
+                            'shape': 'ellipse',
+                            'background-color': '#2196F3',
+                            'width': 8,
+                            'height': 8,
+                            'font-size': '10px',
+                            'color': '#333',
+                            'text-valign': 'top',
+                            'text-margin-y': 5,
+                            'border-width': 2,
+                            'border-color': '#1976D2'
+                        }
+                    },
+                    {
+                        selector: 'node[type="ground"]',
+                        style: {
+                            'background-image': 'data(symbol)',
+                            'background-fit': 'contain',
+                            'background-clip': 'none',
+                            'shape': 'rectangle',
+                            'width': 40,
+                            'height': 40
+                        }
+                    },
+                    {
+                        selector: 'node[type="component"]',
+                        style: {
+                            'shape': 'rectangle',
+                            'background-image': 'data(symbol)',
+                            'background-fit': 'contain',
+                            'background-clip': 'none',
+                            'width': 'data(width)',
+                            'height': 'data(height)'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#999',
+                            'target-arrow-color': '#999',
+                            'curve-style': 'bezier',
+                            'label': 'data(label)',
+                            'font-size': '10px',
+                            'text-rotation': 'autorotate',
+                            'text-background-color': '#fff',
+                            'text-background-opacity': 0.8,
+                            'text-background-padding': '3px'
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'fcose',
+                    quality: "default",
+                    randomize: false,
+                    animate: true,
+                    animationDuration: 1000,
+                    nodeSeparation: 100,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45,
+                    nestingFactor: 0.1,
+                    gravity: 0.25,
+                    numIter: 2500,
+                    tile: true,
+                    tilingPaddingVertical: 10,
+                    tilingPaddingHorizontal: 10
+                }
+            });
+        }
+        
+        function getComponentSymbol(type) {
+            const symbols = {
+                'R': { id: 'resistor', width: 80, height: 30 },
+                'C': { id: 'capacitor', width: 60, height: 40 },
+                'L': { id: 'inductor', width: 80, height: 30 },
+                'D': { id: 'diode', width: 60, height: 40 },
+                'V': { id: 'vsource', width: 50, height: 50 },
+                'I': { id: 'isource', width: 50, height: 50 },
+                'Q': { id: 'npn', width: 60, height: 70 },
+                'M': { id: 'mosfet', width: 60, height: 70 }
+            };
+            return symbols[type] || { id: 'resistor', width: 60, height: 40 };
+        }
+        
+        function getSVGDataURL(symbolId) {
+            const svg = document.querySelector(`symbol#${symbolId}`);
+            if (!svg) return null;
+            
+            const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            const viewBox = svg.getAttribute('viewBox');
+            svgElement.setAttribute('viewBox', viewBox);
+            svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            svgElement.innerHTML = svg.innerHTML;
+            
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgElement);
+            const encodedData = encodeURIComponent(svgString);
+            
+            return `data:image/svg+xml;charset=utf-8,${encodedData}`;
+        }
+        
+        function parseNetlist(netlistText) {
+            const lines = netlistText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('*'));
+            const components = [];
+            const models = {};
+            const nets = new Set();
+            
+            lines.forEach(line => {
+                // Skip model definitions for now, store them
+                if (line.startsWith('.model')) {
+                    const parts = line.split(/\s+/);
+                    if (parts.length >= 2) {
+                        models[parts[1]] = line;
+                    }
+                    return;
+                }
+                
+                // Skip other directives
+                if (line.startsWith('.')) {
+                    return;
+                }
+                
+                // Parse component line
+                const parts = line.split(/\s+/);
+                if (parts.length < 3) return;
+                
+                const name = parts[0];
+                const type = name[0].toUpperCase();
+                
+                // Extract nodes and value
+                let nodes = [];
+                let value = '';
+                
+                if (type === 'V' || type === 'I') {
+                    // Voltage/Current source: V1 n+ n- DC value
+                    nodes = [parts[1], parts[2]];
+                if (net === '0') {
+                    // Ground node with symbol
+                    elements.push({
+                        data: {
+                            id: `net_${net}`,
+                            label: 'GND',
+                            type: 'ground',
+                            symbol: getSVGDataURL('ground'),
+                            width: 40,
+                            height: 40
+                        }
+                    });
+                } else {
+                    // Regular net node (junction point)
+                    elements.push({
+                        data: {
+                            id: `net_${net}`,
+                            label: net,
+                            type: 'net',
+                            width: 8,
+                            height: 8
+                        }
+                    });
+                } value = parts[3] || 'D';
+                } else {
+                    // Generic: name n1 n2 ...
+                    nodes = parts.slice(1, 3);
+                    value = parts.slice(3).join(' ');
+                }
+                
+                nodes.forEach(net => nets.add(net));
+                ymbolInfo = getComponentSymbol(comp.type);
+                const svgURL = getSVGDataURL(symbolInfo.id);
+                
+                elements.push({
+                    data: {
+                        id: comp.name,
+                        label: `${comp.name}: ${comp.value}`,
+                        type: 'component',
+                        symbol: svgURL,
+                        width: symbolInfo.width,
+                        height: symbolInfo.heightets: Array.from(nets), models };
+        }
+        
+        function createGraph(parsed) {
+            const elements = [];
+            
+            // Create nodes for nets
+            parsed.nets.forEach(net => {
+                elements.push({
+                    data: {
+                        id: `net_${net}`,
+                        label: net === '0' ? 'GND' : net,
+                        type: 'net',
+                        color: '#666',
+                        size: 30
+                    }
+                });
+            });
+            
+            // Create nodes for components
+            parsed.components.forEach(comp => {
+                const size = 60;
+                const color = getComponentColor(comp.type);
+                
+                elements.push({
+                    data: {
+                        id: comp.name,
+                        label: `${comp.name}\n${comp.value}`,
+                        type: 'component',
+                        color: color,
+                        size: size
+                    }
+                });
+                
+                // Create edges from component to its nets
+                comp.nodes.forEach((net, idx) => {
+                    elements.push({
+                        data: {
+                            id: `${comp.name}_${net}_${idx}`,
+                            source: comp.name,
+                            target: `net_${net}`,
+                            label: idx === 0 ? '+' : (idx === 1 ? '-' : '')
+                        }
+                    });
+                });
+            });
+            
+            return elements;
+        }
+        
+        function parseAndVisualize() {
+            const netlistText = document.getElementById('netlist').value;
+            const infoDiv = document.getElementById('info');
+            const statsDiv = document.getElementById('stats');
+            
+            try {
+                const parsed = parseNetlist(netlistText);
+                const elements = createGraph(parsed);
+                
+                if (!cy) {
+                    initCytoscape();
+                }
+                
+                cy.elements().remove();
+                cy.add(elements);
+                cy.layout({
+                    name: 'fcose',
+                    quality: "default",
+                    randomize: false,
+                    animate: true,
+                    animationDuration: 1000,
+                    nodeSeparation: 100,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45,
+                    nestingFactor: 0.1,
+                    gravity: 0.25,
+                    numIter: 2500,
+                    tile: true
+                }).run();
+                
+                // Show stats
+                infoDiv.style.display = 'block';
+                infoDiv.className = 'info';
+                infoDiv.innerHTML = '✓ Netlist parsed successfully!';
+                
+                statsDiv.style.display = 'block';
+                statsDiv.innerHTML = `Components: ${parsed.components.length}<br>Nets: ${parsed.nets.length}<br>Models: ${Object.keys(parsed.models).length}`;
+                
+            } catch (error) {
+                infoDiv.style.display = 'block';
+                infoDiv.className = 'info error';
+                infoDiv.innerHTML = `✗ Error: ${error.message}`;
+                statsDiv.style.display = 'none';
+            }
+        }
+        
+        function changeLayout(layoutName) {
+            if (!cy) return;
+            
+            const layoutOptions = {
+                fcose: {
+                    name: 'fcose',
+                    quality: "default",
+                    randomize: false,
+                    animate: true,
+                    animationDuration: 1000,
+                    nodeSeparation: 100,
+                    idealEdgeLength: 100,
+                    edgeElasticity: 0.45
+                },
+                circle: {
+                    name: 'circle',
+                    animate: true,
+                    animationDuration: 1000
+                },
+                grid: {
+                    name: 'grid',
+                    animate: true,
+                    animationDuration: 1000,
+                    rows: undefined,
+                    cols: undefined
+                }
+            };
+            
+            cy.layout(layoutOptions[layoutName] || layoutOptions.fcose).run();
+        }
+        
+        // Initialize on load
+        window.onload = function() {
+            initCytoscape();
+            parseAndVisualize();
+        };
+    </script>
+</body>
+</html>
