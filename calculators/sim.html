@@ -100,26 +100,15 @@
 				font-weight: 600;
 			}
 
-			.zoom-control {
-				display: flex;
-				align-items: center;
-				gap: 0.5rem;
-				font-size: 0.9rem;
-			}
-
-			.zoom-control input {
-				flex: 1;
-			}
-
 			.canvas-wrapper {
 				flex: 1;
 				background: #fff;
 				border: 1px solid #d0d0d0;
 				border-radius: 8px;
-				padding: 0.5rem;
+				padding: 0;
 				display: flex;
-				justify-content: center;
-				align-items: center;
+				justify-content: flex-start;
+				align-items: flex-start;
 			}
 
 			canvas {
@@ -140,9 +129,15 @@
 			}
 
 			.netlist-panel {
+				width: 320px;
+				flex-shrink: 0;
+				background: #fff;
+				border: 1px solid #d0d0d0;
+				border-radius: 8px;
+				padding: 1rem;
 				display: flex;
 				flex-direction: column;
-				gap: 0.4rem;
+				gap: 0.75rem;
 			}
 
 			.netlist-panel h2 {
@@ -175,30 +170,25 @@
 					<button type="button" id="wireToolToggle">Wire Tool</button>
 					<button type="button" id="deleteToolToggle">Delete Tool</button>
 				</div>
-				<p class="status-line">Click inside the canvas to place the active component. Toggle the wire tool to connect pins. Grid size: 20px.</p>
-				<label class="zoom-control" for="zoomControl">
-					<span>Zoom</span>
-					<input type="range" id="zoomControl" min="0.5" max="3" step="0.1" value="1" />
-					<output id="zoomValue" for="zoomControl">100%</output>
-				</label>
-				<div class="netlist-panel" aria-live="polite">
-					<h2>Netlist</h2>
-					<div
-						id="netlistOutput"
-						class="netlist-output"
-						role="textbox"
-						aria-readonly="true"
-						tabindex="0"
-					></div>
-				</div>
+				<p class="status-line">Click inside the canvas to place the active component. Toggle the wire tool to connect pins. Grid size: 5px (dot grid).</p>
 			</section>
 			<div class="canvas-wrapper">
 				<canvas id="editorCanvas" width="1000" height="650" aria-label="Circuit editor canvas"></canvas>
 			</div>
+			<section class="netlist-panel" aria-live="polite">
+				<h2>Netlist</h2>
+				<div
+					id="netlistOutput"
+					class="netlist-output"
+					role="textbox"
+					aria-readonly="true"
+					tabindex="0"
+				></div>
+			</section>
 		</main>
 
 		<script>
-			const GRID_SIZE = 20;
+			const GRID_SIZE = 5;
 			const MIN_ZOOM = 0.5;
 			const MAX_ZOOM = 3;
 			const ZOOM_SENSITIVITY = 0.0015;
@@ -209,8 +199,6 @@
 			const canvas = document.getElementById("editorCanvas");
 			const ctx = canvas.getContext("2d");
 			const palette = document.getElementById("componentPalette");
-			const zoomControl = document.getElementById("zoomControl");
-			const zoomValue = document.getElementById("zoomValue");
 			const wireToolToggle = document.getElementById("wireToolToggle");
 			const deleteToolToggle = document.getElementById("deleteToolToggle");
 			const netlistOutput = document.getElementById("netlistOutput");
@@ -240,7 +228,7 @@
 				referenceMap: Object.create(null),
 			};
 
-			document.addEventListener("DOMContentLoaded", () => {
+				document.addEventListener("DOMContentLoaded", () => {
 				loadLibrary();
 				canvas.addEventListener("pointerdown", handlePointerDown);
 				canvas.addEventListener("pointermove", handlePointerMove);
@@ -248,11 +236,8 @@
 				canvas.addEventListener("pointercancel", handlePointerUp);
 				canvas.addEventListener("pointerleave", handlePointerLeave);
 				canvas.addEventListener("dblclick", handleDoubleClick);
-				canvas.addEventListener("wheel", handleWheel, { passive: false });
-				canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-				if (zoomControl) {
-					zoomControl.addEventListener("input", handleZoomInput);
-				}
+					canvas.addEventListener("wheel", handleWheel, { passive: false });
+					canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 				if (wireToolToggle) {
 					wireToolToggle.addEventListener("click", toggleWireTool);
 					updateWireToggleUI();
@@ -265,15 +250,6 @@
 				document.addEventListener("keyup", handleKeyUp, true);
 				updateNetlist();
 			});
-
-			function handleZoomInput(event) {
-				const nextZoom = clamp(Number(event.target.value), MIN_ZOOM, MAX_ZOOM);
-				if (!Number.isFinite(nextZoom) || nextZoom <= 0) {
-					return;
-				}
-				const focus = canvasToWorld(canvas.width / 2, canvas.height / 2);
-				applyZoom(nextZoom, focus, { x: canvas.width / 2, y: canvas.height / 2 });
-			}
 
 			function handleWheel(event) {
 				if (!state.ready) {
@@ -992,11 +968,11 @@
 						return;
 					}
 					const placementId = ensurePlacementId(placement);
-					const prefix = guessDesignatorPrefix(placement.type, component);
-					const nextIndex = (prefixCounters.get(prefix) || 0) + 1;
-					prefixCounters.set(prefix, nextIndex);
-					const reference = `${prefix}${nextIndex}`;
-					referenceMap[placementId] = reference;
+					const reference = buildReferenceForPlacement(placement, component, prefixCounters);
+					referenceMap[placementId] = reference || "";
+					if (shouldExcludeFromNetlist(component)) {
+						return;
+					}
 					const pins = component.pins || [];
 					const nodeLabels = pins.map((pin, index) => {
 						const key = makePinKey(placementId, pin.id);
@@ -1016,16 +992,21 @@
 			function buildNetAssignments() {
 				const uf = new UnionFind();
 				const pinRefs = [];
+				const groundPinKeys = new Set();
 				state.placements.forEach((placement) => {
 					const component = state.library[placement.type];
 					if (!component) {
 						return;
 					}
 					const placementId = ensurePlacementId(placement);
+					const isGround = isGroundComponent(component);
 					(component.pins || []).forEach((pin) => {
 						const key = makePinKey(placementId, pin.id);
 						pinRefs.push(key);
 						uf.add(key);
+						if (isGround) {
+							groundPinKeys.add(key);
+						}
 					});
 				});
 				state.wires.forEach((wire) => {
@@ -1037,13 +1018,22 @@
 				});
 				const pinToNet = new Map();
 				const rootToLabel = new Map();
+				const groundRoots = new Set();
+				groundPinKeys.forEach((key) => {
+					const root = uf.find(key);
+					groundRoots.add(root);
+				});
 				let nextLabelIndex = 1;
 				pinRefs.forEach((key) => {
 					const root = uf.find(key);
 					let label = rootToLabel.get(root);
 					if (!label) {
-						label = `N${String(nextLabelIndex).padStart(3, "0")}`;
-						nextLabelIndex += 1;
+						if (groundRoots.has(root)) {
+							label = "0";
+						} else {
+							label = `N${String(nextLabelIndex).padStart(3, "0")}`;
+							nextLabelIndex += 1;
+						}
 						rootToLabel.set(root, label);
 					}
 					pinToNet.set(key, label);
@@ -1062,6 +1052,60 @@
 					default:
 						return "1";
 				}
+			}
+
+			function getDesignatorConfig(typeKey, component) {
+				if (!component && typeKey) {
+					component = state.library[typeKey];
+				}
+				return component?.designator || null;
+			}
+
+			function getDesignatorPrefix(typeKey, component) {
+				const config = getDesignatorConfig(typeKey, component);
+				if (config && typeof config.prefix === "string") {
+					const trimmed = config.prefix.trim();
+					if (trimmed) {
+						return trimmed;
+					}
+				}
+				return guessDesignatorPrefix(typeKey, component);
+			}
+
+			function shouldAutoIncrementDesignator(component, typeKey) {
+				const config = getDesignatorConfig(typeKey, component);
+				if (!config || typeof config.autoIncrement === "undefined") {
+					return true;
+				}
+				return Boolean(config.autoIncrement);
+			}
+
+			function buildReferenceForPlacement(placement, component, prefixCounters) {
+				const prefix = getDesignatorPrefix(placement.type, component);
+				if (!prefix) {
+					return "";
+				}
+				if (!shouldAutoIncrementDesignator(component, placement.type)) {
+					return prefix;
+				}
+				const nextIndex = (prefixCounters.get(prefix) || 0) + 1;
+				prefixCounters.set(prefix, nextIndex);
+				return `${prefix}${nextIndex}`;
+			}
+
+			function isGroundComponent(componentOrType) {
+				if (!componentOrType) {
+					return false;
+				}
+				if (typeof componentOrType === "string") {
+					const typeComponent = state.library[componentOrType];
+					return Boolean(typeComponent?.isGround);
+				}
+				return Boolean(componentOrType.isGround);
+			}
+
+			function shouldExcludeFromNetlist(component) {
+				return Boolean(component?.isGround || component?.excludeFromNetlist);
 			}
 
 			function guessDesignatorPrefix(typeKey, component) {
@@ -1089,7 +1133,7 @@
 				if (!component) {
 					return "";
 				}
-				const prefix = guessDesignatorPrefix(typeKey, component);
+				const prefix = getDesignatorPrefix(typeKey, component);
 				return component.defaultValue || component.value || defaultComponentValue(prefix);
 			}
 
@@ -1151,6 +1195,10 @@
 
 			function buildSprite(key, component) {
 				return new Promise((resolve, reject) => {
+					if (!component || typeof component.svg !== "string") {
+						reject(new Error(`Missing SVG for component ${key}`));
+						return;
+					}
 					const img = new Image();
 					img.onload = () => {
 						state.sprites[key] = img;
@@ -1202,35 +1250,9 @@
 				ctx.save();
 				ctx.scale(scale, scale);
 				ctx.translate(-state.panX, -state.panY);
-				drawGrid(scale);
 				drawCrosshairGuides(scale);
 				drawWires(scale);
 				state.placements.forEach((instance) => drawComponent(instance, scale));
-				ctx.restore();
-			}
-
-			function drawGrid(scale) {
-				ctx.save();
-				ctx.strokeStyle = "#99baaa";
-				const dashLength = 1 / scale;
-				ctx.setLineDash([dashLength, dashLength * 3]);
-				ctx.lineWidth = Math.max(0.5 / scale, 0.25 / scale);
-				const left = state.panX;
-				const top = state.panY;
-				const right = left + canvas.width / scale;
-				const bottom = top + canvas.height / scale;
-				const startX = Math.floor(left / GRID_SIZE) * GRID_SIZE - GRID_SIZE;
-				const startY = Math.floor(top / GRID_SIZE) * GRID_SIZE - GRID_SIZE;
-				ctx.beginPath();
-				for (let x = startX; x <= right + GRID_SIZE; x += GRID_SIZE) {
-					ctx.moveTo(x, top - GRID_SIZE);
-					ctx.lineTo(x, bottom + GRID_SIZE);
-				}
-				for (let y = startY; y <= bottom + GRID_SIZE; y += GRID_SIZE) {
-					ctx.moveTo(left - GRID_SIZE, y);
-					ctx.lineTo(right + GRID_SIZE, y);
-				}
-				ctx.stroke();
 				ctx.restore();
 			}
 
@@ -1297,7 +1319,8 @@
 
 				const halfWidth = component.size.width / 2;
 				const halfHeight = component.size.height / 2;
-				const rotationRadians = toRadians(getPlacementRotation(instance));
+				const rotationDegrees = getPlacementRotation(instance);
+				const rotationRadians = toRadians(rotationDegrees);
 				const localDrawX = -halfWidth;
 				const localDrawY = -halfHeight;
 				const valueLabel = getPlacementValue(instance);
@@ -1306,29 +1329,39 @@
 				const orientationFactor = Math.abs(Math.sin(rotationRadians));
 				const topAnchorY = localDrawY;
 				const bottomAnchorY = localDrawY + component.size.height;
+				const valueAnchor = valueLabel
+					? getComponentLabelAnchor(component, "value", rotationDegrees)
+					: null;
+				const designatorAnchor = referenceLabel
+					? getComponentLabelAnchor(component, "designator", rotationDegrees)
+					: null;
 				const valueLabelPosition = valueLabel
-					? getLabelWorldPosition(
-						instance,
-						topAnchorY,
-						rotationRadians,
-						scale,
-						-1,
-						6,
-						14,
-						orientationFactor
-					)
+					? valueAnchor
+						? transformLabelAnchorToWorld(instance, component, valueAnchor, rotationRadians)
+						: getLabelWorldPosition(
+							instance,
+							topAnchorY,
+							rotationRadians,
+							scale,
+							-1,
+							6,
+							14,
+							orientationFactor
+						)
 					: null;
 				const referenceLabelPosition = referenceLabel
-					? getLabelWorldPosition(
-						instance,
-						bottomAnchorY,
-						rotationRadians,
-						scale,
-						1,
-						4,
-						12,
-						orientationFactor
-					)
+					? designatorAnchor
+						? transformLabelAnchorToWorld(instance, component, designatorAnchor, rotationRadians)
+						: getLabelWorldPosition(
+							instance,
+							bottomAnchorY,
+							rotationRadians,
+							scale,
+							1,
+							4,
+							12,
+							orientationFactor
+						)
 					: null;
 
 				ctx.save();
@@ -1337,28 +1370,31 @@
 					ctx.rotate(rotationRadians);
 				}
 				ctx.drawImage(sprite, localDrawX, localDrawY, component.size.width, component.size.height);
-
-				const pinRadius = 4 / scale;
-				const pins = component.pins || [];
-				pins.forEach((pin) => {
-					const pinX = localDrawX + pin.position.x;
-					const pinY = localDrawY + pin.position.y;
-					const isActivePin =
-						state.pendingWire &&
-						state.pendingWire.from.placementId === placementId &&
-						state.pendingWire.from.pinId === pin.id;
-					ctx.fillStyle = isActivePin ? "#f97316" : "#2563eb";
-					ctx.beginPath();
-					ctx.arc(pinX, pinY, pinRadius, 0, Math.PI * 2);
-					ctx.fill();
-				});
+				const activePinId =
+					state.pendingWire &&
+					state.pendingWire.from.placementId === placementId
+						? state.pendingWire.from.pinId
+						: null;
+				if (activePinId) {
+					const pins = component.pins || [];
+					const highlightPin = pins.find((pin) => pin.id === activePinId && pin.position);
+					if (highlightPin && highlightPin.position) {
+						const pinX = localDrawX + highlightPin.position.x;
+						const pinY = localDrawY + highlightPin.position.y;
+						const highlightRadius = 6 / scale;
+						ctx.strokeStyle = "#f97316";
+						ctx.lineWidth = 2 / scale;
+						ctx.beginPath();
+						ctx.arc(pinX, pinY, highlightRadius, 0, Math.PI * 2);
+						ctx.stroke();
+					}
+				}
 				ctx.restore();
 
 				if (valueLabel && valueLabelPosition) {
 					ctx.save();
 					const pixelFontSize = 14;
-					const fontSize = pixelFontSize / scale;
-					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					ctx.font = `${pixelFontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
 					ctx.textAlign = "center";
 					ctx.textBaseline = "bottom";
 					ctx.fillStyle = "#0f172a";
@@ -1369,8 +1405,7 @@
 				if (referenceLabel && referenceLabelPosition) {
 					ctx.save();
 					const pixelFontSize = 12;
-					const fontSize = pixelFontSize / scale;
-					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					ctx.font = `${pixelFontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
 					ctx.textAlign = "center";
 					ctx.textBaseline = "top";
 					ctx.fillStyle = "#1f2937";
@@ -1505,28 +1540,45 @@
 				};
 			}
 
+			function getComponentLabelAnchor(component, labelKey, rotationDegrees) {
+				if (!component || !component.labels) {
+					return null;
+				}
+				const anchors = component.labels[labelKey];
+				if (!Array.isArray(anchors) || !anchors.length) {
+					return null;
+				}
+				const normalized = normalizeRotation(rotationDegrees);
+				const index = normalized === 90 || normalized === 270 ? 1 : 0;
+				return anchors[index] || anchors[0] || null;
+			}
+
+			function transformLabelAnchorToWorld(instance, component, anchor, rotationRadians) {
+				if (!instance || !component || !component.size || !anchor) {
+					return null;
+				}
+				const localX = (anchor.x ?? 0) - component.size.width / 2;
+				const localY = (anchor.y ?? 0) - component.size.height / 2;
+				const rotated = rotationRadians
+					? rotatePoint(localX, localY, rotationRadians)
+					: { x: localX, y: localY };
+				return {
+					x: instance.x + rotated.x,
+					y: instance.y + rotated.y,
+				};
+			}
+
 			function applyZoom(nextZoom, focusWorld, canvasPoint) {
 				const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
 				const screenPoint = canvasPoint || { x: canvas.width / 2, y: canvas.height / 2 };
 				const focus = focusWorld || canvasToWorld(screenPoint.x, screenPoint.y);
 				if (!Number.isFinite(clampedZoom) || clampedZoom === state.zoom) {
-					syncZoomControls();
 					return;
 				}
 				state.zoom = clampedZoom;
 				state.panX = focus.x - screenPoint.x / state.zoom;
 				state.panY = focus.y - screenPoint.y / state.zoom;
-				syncZoomControls();
 				requestRender();
-			}
-
-			function syncZoomControls() {
-				if (zoomControl && document.activeElement !== zoomControl) {
-					zoomControl.value = state.zoom.toFixed(2);
-				}
-				if (zoomValue) {
-					zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
-				}
 			}
 
 			function clamp(value, min, max) {
