@@ -1199,13 +1199,14 @@
 						reject(new Error(`Missing SVG for component ${key}`));
 						return;
 					}
+					const svgMarkup = ensureSvgWithPinDots(component) || component.svg;
 					const img = new Image();
 					img.onload = () => {
 						state.sprites[key] = img;
 						resolve();
 					};
 					img.onerror = reject;
-					img.src = svgToDataUrl(component.svg);
+					img.src = svgToDataUrl(svgMarkup);
 				});
 			}
 
@@ -1213,6 +1214,73 @@
 				const trimmed = svgString.trim();
 				const encoded = window.btoa(unescape(encodeURIComponent(trimmed)));
 				return `data:image/svg+xml;base64,${encoded}`;
+			}
+
+			function ensureSvgWithPinDots(component) {
+				if (!component || typeof component.svg !== "string") {
+					return "";
+				}
+				if (component.__svgWithPinDots) {
+					return component.__svgWithPinDots;
+				}
+				const pins = Array.isArray(component.pins) ? component.pins : [];
+				if (!pins.length || !component.size || !component.size.width || !component.size.height) {
+					component.__svgWithPinDots = component.svg;
+					return component.svg;
+				}
+				const viewBox = parseViewBoxFromSvg(component.svg);
+				if (!viewBox || !viewBox.width || !viewBox.height) {
+					component.__svgWithPinDots = component.svg;
+					return component.svg;
+				}
+				const desiredRadius = Number.isFinite(component.pinDotRadius) ? component.pinDotRadius : 4;
+				const strokeBase = Number.isFinite(component.pinDotStroke) ? component.pinDotStroke : 1.2;
+				const scaleX = viewBox.width / component.size.width;
+				const scaleY = viewBox.height / component.size.height;
+				if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX === 0 || scaleY === 0) {
+					component.__svgWithPinDots = component.svg;
+					return component.svg;
+				}
+				const strokeWidth = strokeBase * Math.max(scaleX, scaleY);
+				const dots = pins
+					.filter((pin) => pin && pin.position && Number.isFinite(pin.position.x) && Number.isFinite(pin.position.y))
+					.map((pin) => {
+						const cx = viewBox.minX + pin.position.x * scaleX;
+						const cy = viewBox.minY + pin.position.y * scaleY;
+						const rx = desiredRadius * scaleX;
+						const ry = desiredRadius * scaleY;
+						return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#0f172a" stroke="#f8fafc" stroke-width="${strokeWidth}" />`;
+					})
+					.join("");
+				if (!dots) {
+					component.__svgWithPinDots = component.svg;
+					return component.svg;
+				}
+				const marker = `<g data-pin-dots="true">${dots}</g>`;
+				const replaced = component.svg.replace(/<\/svg>\s*$/i, `${marker}</svg>`);
+				const finalMarkup = replaced === component.svg ? `${component.svg}${marker}` : replaced;
+				component.__svgWithPinDots = finalMarkup;
+				return finalMarkup;
+			}
+
+			function parseViewBoxFromSvg(svgString) {
+				if (typeof svgString !== "string") {
+					return null;
+				}
+				const match = svgString.match(/viewBox\s*=\s*"([^"]+)"/i);
+				if (!match) {
+					return null;
+				}
+				const parts = match[1].trim().split(/\s+/).map(Number);
+				if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
+					return null;
+				}
+				return {
+					minX: parts[0],
+					minY: parts[1],
+					width: parts[2],
+					height: parts[3],
+				};
 			}
 
 			function updatePalette() {
@@ -1394,7 +1462,8 @@
 				if (valueLabel && valueLabelPosition) {
 					ctx.save();
 					const pixelFontSize = 14;
-					ctx.font = `${pixelFontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					const fontSize = pixelFontSize / scale;
+					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
 					ctx.textAlign = "center";
 					ctx.textBaseline = "bottom";
 					ctx.fillStyle = "#0f172a";
@@ -1405,7 +1474,8 @@
 				if (referenceLabel && referenceLabelPosition) {
 					ctx.save();
 					const pixelFontSize = 12;
-					ctx.font = `${pixelFontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
+					const fontSize = pixelFontSize / scale;
+					ctx.font = `${fontSize}px "IBM Plex Sans", "Segoe UI", system-ui`;
 					ctx.textAlign = "center";
 					ctx.textBaseline = "top";
 					ctx.fillStyle = "#1f2937";

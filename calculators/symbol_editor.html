@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Circuit Symbol Editor</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <style>
         * {
             box-sizing: border-box;
@@ -106,6 +107,19 @@
             cursor: pointer;
             font-size: 13px;
             transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .btn .material-symbols-outlined {
+            font-size: 18px;
+        }
+        
+        .btn-icon {
+            padding: 8px;
+            min-width: 36px;
         }
         
         .btn-primary {
@@ -369,9 +383,15 @@
             <h2>Components</h2>
             <div class="component-list" id="componentList"></div>
             <div class="btn-group">
-                <button class="btn btn-primary" onclick="newComponent()">+ New</button>
-                <button class="btn btn-secondary" onclick="duplicateComponent()">Duplicate</button>
-                <button class="btn btn-danger" onclick="deleteComponent()">Delete</button>
+                <button class="btn btn-primary btn-icon" onclick="newComponent()" title="New Component">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="duplicateComponent()" title="Duplicate Component">
+                    <span class="material-symbols-outlined">content_copy</span>
+                </button>
+                <button class="btn btn-danger btn-icon" onclick="deleteComponent()" title="Delete Component">
+                    <span class="material-symbols-outlined">delete</span>
+                </button>
             </div>
             <div class="btn-group">
                 <input type="file" id="fileInput" accept=".json" onchange="loadFromFile(event)">
@@ -382,14 +402,29 @@
         <!-- Center: Canvas -->
         <div class="panel canvas-container">
             <div class="toolbar">
-                <button class="btn btn-secondary" onclick="setMode('select')" id="btn-select">Select</button>
-                <button class="btn btn-secondary" onclick="setMode('line')" id="btn-line">Line</button>
-                <button class="btn btn-secondary" onclick="setMode('circle')" id="btn-circle">Circle</button>
-                <button class="btn btn-secondary" onclick="setMode('arc')" id="btn-arc">Arc</button>
-                <button class="btn btn-secondary" onclick="setMode('polygon')" id="btn-polygon">Polygon</button>
-                <button class="btn btn-secondary" onclick="setMode('pin')" id="btn-pin">Pin</button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('select')" id="btn-select" title="Select">
+                    <span class="material-symbols-outlined">near_me</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('line')" id="btn-line" title="Line">
+                    <span class="material-symbols-outlined">diagonal_line</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('circle')" id="btn-circle" title="Circle">
+                    <span class="material-symbols-outlined">circle</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('arc')" id="btn-arc" title="Arc">
+                    <span class="material-symbols-outlined">line_curve</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('polygon')" id="btn-polygon" title="Polygon">
+                    <span class="material-symbols-outlined">pentagon</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('pin')" id="btn-pin" title="Pin">
+                    <span class="material-symbols-outlined">line_end_circle</span>
+                </button>
                 <div class="separator"></div>
-                <span class="mode-indicator mode-select" id="modeIndicator">SELECT</span>
+                <label>Stroke:</label>
+                <input type="number" id="strokeWidth" value="4" min="1" max="10" onchange="updateSelectedStroke()">
+                <input type="checkbox" id="filled" style="margin-left: 10px;">
+                <label for="filled">Filled</label>
                 <div class="separator"></div>
                 <label>Grid:</label>
                 <input type="number" id="gridSize" value="5" min="1" max="20" onchange="redraw()">
@@ -403,13 +438,12 @@
                 <div class="canvas-info" id="canvasInfo">x: 0, y: 0</div>
             </div>
             <div class="toolbar" style="margin-top: 10px;">
-                <button class="btn btn-secondary" onclick="deleteSelected()">Delete Selected</button>
-                <button class="btn btn-secondary" onclick="clearDrawing()">Clear All</button>
-                <div class="separator"></div>
-                <label>Stroke:</label>
-                <input type="number" id="strokeWidth" value="4" min="1" max="10" onchange="updateSelectedStroke()">
-                <input type="checkbox" id="filled" style="margin-left: 10px;">
-                <label for="filled">Filled</label>
+                <button class="btn btn-secondary btn-icon" onclick="deleteSelected()" title="Delete Selected">
+                    <span class="material-symbols-outlined">backspace</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="clearDrawing()" title="Clear All">
+                    <span class="material-symbols-outlined">delete_sweep</span>
+                </button>
             </div>
         </div>
         
@@ -489,12 +523,18 @@
         let elements = []; // Drawing elements for current component
         let pins = []; // Pins for current component
         let selectedElement = null;
+        let selectedElements = new Set(); // Multiple selected elements
         let isDrawing = false;
         let isDragging = false;
+        let isSelecting = false; // Drag-selecting multiple elements
         let dragStart = null;
         let drawStart = null;
+        let selectionRect = null; // { x1, y1, x2, y2 } in component coords
         let polygonPoints = [];
         let editingVertex = null; // { elementIndex, vertexIndex or 'start'/'end' }
+        let undoStack = []; // Stack of actions for undo
+        let originalElementState = null; // Element state at start of drag
+        let originalElementStates = new Map(); // Map of element states for multi-drag
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -507,6 +547,14 @@
             canvas.addEventListener('mousemove', onMouseMove);
             canvas.addEventListener('mouseup', onMouseUp);
             canvas.addEventListener('dblclick', onDoubleClick);
+            
+            // Keyboard shortcuts
+            window.addEventListener('keydown', (e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+                    e.preventDefault();
+                    undo();
+                }
+            });
             
             // Load default components
             loadDefaultComponents();
@@ -683,7 +731,7 @@
             
             // Draw elements
             elements.forEach((el, idx) => {
-                const isSelected = selectedElement === idx;
+                const isSelected = selectedElement === idx || selectedElements.has(idx);
                 drawElement(el, isSelected, zoom, offsetX, offsetY);
             });
             
@@ -715,6 +763,20 @@
                     ctx.lineTo(p.x, p.y);
                 });
                 ctx.stroke();
+            }
+            
+            // Draw selection rectangle
+            if (isSelecting && selectionRect) {
+                const start = componentToCanvas(selectionRect.x1, selectionRect.y1);
+                const end = componentToCanvas(selectionRect.x2, selectionRect.y2);
+                
+                ctx.strokeStyle = '#0066ff';
+                ctx.fillStyle = 'rgba(0, 102, 255, 0.1)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
+                ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+                ctx.setLineDash([]);
             }
         }
         
@@ -769,26 +831,71 @@
             const pos = canvasToComponent(cx, cy);
             
             if (mode === 'select') {
+                const shiftKey = e.shiftKey;
+                
                 // First check if clicking on a vertex
                 const vertex = findVertexAt(pos.x, pos.y);
                 if (vertex) {
                     // Start editing this vertex
                     editingVertex = vertex;
                     selectedElement = vertex.elementIndex;
+                    selectedElements.clear();
                     isDragging = true;
                     dragStart = pos;
+                    // Save state for undo
+                    undoStack.push({
+                        type: 'move',
+                        index: selectedElement,
+                        before: JSON.parse(JSON.stringify(elements[selectedElement]))
+                    });
                 } else {
                     // Try to select an element or pin
                     const clickedElement = findElementAt(pos.x, pos.y);
                     if (clickedElement !== null) {
-                        // Select the element and start dragging immediately
-                        selectedElement = clickedElement;
-                        isDragging = true;
-                        dragStart = pos;
-                        editingVertex = null;
+                        // Handle multi-selection with shift
+                        if (shiftKey) {
+                            if (selectedElements.has(clickedElement)) {
+                                selectedElements.delete(clickedElement);
+                            } else {
+                                selectedElements.add(clickedElement);
+                            }
+                            selectedElement = null;
+                        } else {
+                            // Single selection - check if clicking on already selected element(s)
+                            if (selectedElements.size > 0 && selectedElements.has(clickedElement)) {
+                                // Start dragging all selected elements
+                                isDragging = true;
+                                dragStart = pos;
+                                editingVertex = null;
+                                // Save original states for all selected elements
+                                originalElementStates.clear();
+                                selectedElements.forEach(idx => {
+                                    originalElementStates.set(idx, JSON.parse(JSON.stringify(elements[idx])));
+                                });
+                            } else {
+                                // New single selection
+                                selectedElement = clickedElement;
+                                selectedElements.clear();
+                                isDragging = true;
+                                dragStart = pos;
+                                editingVertex = null;
+                                // Save original state for dragging and undo
+                                originalElementState = JSON.parse(JSON.stringify(elements[selectedElement]));
+                                undoStack.push({
+                                    type: 'move',
+                                    index: selectedElement,
+                                    before: originalElementState
+                                });
+                            }
+                        }
                     } else {
-                        // Deselect if clicking empty space
-                        selectedElement = null;
+                        // Start drag selection if clicking empty space
+                        if (!shiftKey) {
+                            selectedElement = null;
+                            selectedElements.clear();
+                        }
+                        isSelecting = true;
+                        selectionRect = { x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y };
                         editingVertex = null;
                     }
                 }
@@ -818,7 +925,12 @@
             
             document.getElementById('canvasInfo').textContent = `x: ${pos.x}, y: ${pos.y}`;
             
-            if (isDragging && dragStart) {
+            if (isSelecting && selectionRect) {
+                // Update selection rectangle
+                selectionRect.x2 = pos.x;
+                selectionRect.y2 = pos.y;
+                redraw();
+            } else if (isDragging && dragStart) {
                 if (editingVertex) {
                     // Edit only the selected vertex
                     const el = elements[editingVertex.elementIndex];
@@ -835,29 +947,102 @@
                         el.points[editingVertex.vertex].y = pos.y;
                     }
                     redraw();
-                } else if (selectedElement !== null) {
-                    // Drag entire element
-                    const dx = pos.x - dragStart.x;
-                    const dy = pos.y - dragStart.y;
+                } else if (selectedElements.size > 0 && originalElementStates.size > 0) {
+                    // Drag multiple selected elements
+                    const snapToGrid = document.getElementById('snapToGrid').checked;
+                    const gridSize = parseInt(document.getElementById('gridSize').value);
                     
-                    // Update element position
+                    // Calculate offset from drag start
+                    let offsetX = pos.x - dragStart.x;
+                    let offsetY = pos.y - dragStart.y;
+                    
+                    // Snap offset to grid if enabled
+                    if (snapToGrid) {
+                        offsetX = Math.round(offsetX / gridSize) * gridSize;
+                        offsetY = Math.round(offsetY / gridSize) * gridSize;
+                    }
+                    
+                    // Apply offset to all selected elements
+                    selectedElements.forEach(idx => {
+                        const el = elements[idx];
+                        const orig = originalElementStates.get(idx);
+                        
+                        if (el.type === 'line') {
+                            el.x1 = orig.x1 + offsetX;
+                            el.y1 = orig.y1 + offsetY;
+                            el.x2 = orig.x2 + offsetX;
+                            el.y2 = orig.y2 + offsetY;
+                        } else if (el.type === 'circle' || el.type === 'arc') {
+                            el.cx = orig.cx + offsetX;
+                            el.cy = orig.cy + offsetY;
+                        } else if (el.type === 'polygon' && el.points) {
+                            el.points.forEach((p, i) => {
+                                p.x = orig.points[i].x + offsetX;
+                                p.y = orig.points[i].y + offsetY;
+                            });
+                        }
+                    });
+                    
+                    redraw();
+                } else if (selectedElement !== null && originalElementState) {
+                    // Drag single element - snap the target position to grid
+                    const snapToGrid = document.getElementById('snapToGrid').checked;
                     const el = elements[selectedElement];
+                    const orig = originalElementState;
+                    
+                    // Calculate offset from drag start
+                    const offsetX = pos.x - dragStart.x;
+                    const offsetY = pos.y - dragStart.y;
+                    
+                    // Calculate where the reference point would be
+                    let targetX, targetY;
                     if (el.type === 'line') {
-                        el.x1 += dx;
-                        el.y1 += dy;
-                        el.x2 += dx;
-                        el.y2 += dy;
+                        targetX = orig.x1 + offsetX;
+                        targetY = orig.y1 + offsetY;
                     } else if (el.type === 'circle' || el.type === 'arc') {
-                        el.cx += dx;
-                        el.cy += dy;
+                        targetX = orig.cx + offsetX;
+                        targetY = orig.cy + offsetY;
                     } else if (el.type === 'polygon' && el.points) {
-                        el.points.forEach(p => {
-                            p.x += dx;
-                            p.y += dy;
+                        targetX = orig.points[0].x + offsetX;
+                        targetY = orig.points[0].y + offsetY;
+                    }
+                    
+                    // Snap target position to grid if enabled
+                    if (snapToGrid) {
+                        const gridSize = parseInt(document.getElementById('gridSize').value);
+                        targetX = Math.round(targetX / gridSize) * gridSize;
+                        targetY = Math.round(targetY / gridSize) * gridSize;
+                    }
+                    
+                    // Calculate actual delta to apply (from original to snapped target)
+                    let dx, dy;
+                    if (el.type === 'line') {
+                        dx = targetX - orig.x1;
+                        dy = targetY - orig.y1;
+                    } else if (el.type === 'circle' || el.type === 'arc') {
+                        dx = targetX - orig.cx;
+                        dy = targetY - orig.cy;
+                    } else if (el.type === 'polygon' && el.points) {
+                        dx = targetX - orig.points[0].x;
+                        dy = targetY - orig.points[0].y;
+                    }
+                    
+                    // Apply delta to all points
+                    if (el.type === 'line') {
+                        el.x1 = orig.x1 + dx;
+                        el.y1 = orig.y1 + dy;
+                        el.x2 = orig.x2 + dx;
+                        el.y2 = orig.y2 + dy;
+                    } else if (el.type === 'circle' || el.type === 'arc') {
+                        el.cx = orig.cx + dx;
+                        el.cy = orig.cy + dy;
+                    } else if (el.type === 'polygon' && el.points) {
+                        el.points.forEach((p, i) => {
+                            p.x = orig.points[i].x + dx;
+                            p.y = orig.points[i].y + dy;
                         });
                     }
                     
-                    dragStart = pos;
                     redraw();
                 }
             } else if (isDrawing && drawStart) {
@@ -888,10 +1073,56 @@
         }
         
         function onMouseUp(e) {
+            if (isSelecting) {
+                // Finish selection rectangle
+                if (selectionRect) {
+                    const minX = Math.min(selectionRect.x1, selectionRect.x2);
+                    const maxX = Math.max(selectionRect.x1, selectionRect.x2);
+                    const minY = Math.min(selectionRect.y1, selectionRect.y2);
+                    const maxY = Math.max(selectionRect.y1, selectionRect.y2);
+                    
+                    // Find elements within rectangle
+                    elements.forEach((el, idx) => {
+                        if (isElementInRect(el, minX, minY, maxX, maxY)) {
+                            selectedElements.add(idx);
+                        }
+                    });
+                }
+                
+                isSelecting = false;
+                selectionRect = null;
+                updateElementList();
+                redraw();
+                return;
+            }
+            
             if (isDragging) {
+                // Check if element actually moved
+                if (selectedElements.size > 0 && originalElementStates.size > 0) {
+                    // Save undo for multi-element move
+                    const beforeStates = new Map();
+                    originalElementStates.forEach((state, idx) => {
+                        beforeStates.set(idx, state);
+                    });
+                    undoStack.push({
+                        type: 'multi-move',
+                        states: beforeStates,
+                        indices: Array.from(selectedElements)
+                    });
+                    originalElementStates.clear();
+                } else if (undoStack.length > 0 && undoStack[undoStack.length - 1].type === 'move') {
+                    const lastAction = undoStack[undoStack.length - 1];
+                    const current = elements[lastAction.index];
+                    const before = lastAction.before;
+                    // If no actual change, remove the undo action
+                    if (JSON.stringify(current) === JSON.stringify(before)) {
+                        undoStack.pop();
+                    }
+                }
                 isDragging = false;
                 dragStart = null;
                 editingVertex = null;
+                originalElementState = null;
                 updateElementList();
                 redraw();
                 return;
@@ -918,6 +1149,7 @@
                     y2: pos.y,
                     strokeWidth
                 });
+                undoStack.push({ type: 'create', index: elements.length - 1 });
             } else if (mode === 'circle') {
                 const radius = Math.sqrt(Math.pow(pos.x - drawStart.x, 2) + Math.pow(pos.y - drawStart.y, 2));
                 elements.push({
@@ -928,6 +1160,7 @@
                     strokeWidth,
                     filled
                 });
+                undoStack.push({ type: 'create', index: elements.length - 1 });
             } else if (mode === 'arc') {
                 const radius = Math.sqrt(Math.pow(pos.x - drawStart.x, 2) + Math.pow(pos.y - drawStart.y, 2));
                 const angle = Math.atan2(pos.y - drawStart.y, pos.x - drawStart.x);
@@ -940,6 +1173,7 @@
                     endAngle: angle,
                     strokeWidth
                 });
+                undoStack.push({ type: 'create', index: elements.length - 1 });
             }
             
             isDrawing = false;
@@ -959,6 +1193,7 @@
                     strokeWidth,
                     filled
                 });
+                undoStack.push({ type: 'create', index: elements.length - 1 });
                 
                 polygonPoints = [];
                 updateElementList();
@@ -967,7 +1202,7 @@
         }
         
         function findElementAt(x, y) {
-            const threshold = 2; // Very tight threshold for precise selection
+            const threshold = 3; // Balanced threshold for element selection
             
             for (let i = elements.length - 1; i >= 0; i--) {
                 const el = elements[i];
@@ -1044,6 +1279,22 @@
             return Math.sqrt(Math.pow(px - xx, 2) + Math.pow(py - yy, 2));
         }
         
+        function isElementInRect(el, minX, minY, maxX, maxY) {
+            // Check if any part of the element is within the rectangle
+            if (el.type === 'line') {
+                // Check if either endpoint is in rect, or if line intersects rect
+                return (el.x1 >= minX && el.x1 <= maxX && el.y1 >= minY && el.y1 <= maxY) ||
+                       (el.x2 >= minX && el.x2 <= maxX && el.y2 >= minY && el.y2 <= maxY);
+            } else if (el.type === 'circle' || el.type === 'arc') {
+                // Check if center is in rect (simplified)
+                return el.cx >= minX && el.cx <= maxX && el.cy >= minY && el.cy <= maxY;
+            } else if (el.type === 'polygon' && el.points) {
+                // Check if any point is in rect
+                return el.points.some(p => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY);
+            }
+            return false;
+        }
+        
         // Pin management
         function addPin(pos) {
             const id = (pins.length + 1).toString();
@@ -1106,8 +1357,10 @@
         // Element list
         function updateElementList() {
             const container = document.getElementById('elementList');
-            container.innerHTML = elements.map((el, idx) => `
-                <div class="element-item ${selectedElement === idx ? 'selected' : ''}" onclick="selectElement(${idx})">
+            container.innerHTML = elements.map((el, idx) => {
+                const isSelected = selectedElement === idx || selectedElements.has(idx);
+                return `
+                <div class="element-item ${isSelected ? 'selected' : ''}" onclick="selectElement(${idx}, event)">
                     <div class="element-header">
                         <span>${el.type}</span>
                         <button class="btn btn-danger small-btn" onclick="removeElement(${idx}); event.stopPropagation();">×</button>
@@ -1116,7 +1369,7 @@
                         ${formatElementInfo(el)}
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
         
         function formatElementInfo(el) {
@@ -1127,37 +1380,95 @@
             return '';
         }
         
-        function selectElement(idx) {
-            selectedElement = idx;
+        function selectElement(idx, event) {
+            if (event && event.shiftKey) {
+                // Toggle selection with shift
+                if (selectedElements.has(idx)) {
+                    selectedElements.delete(idx);
+                } else {
+                    selectedElements.add(idx);
+                }
+                selectedElement = null;
+            } else {
+                // Single selection
+                selectedElement = idx;
+                selectedElements.clear();
+            }
             updateElementList();
             redraw();
         }
         
         function removeElement(idx) {
+            const element = elements[idx];
+            undoStack.push({ type: 'delete', index: idx, element: JSON.parse(JSON.stringify(element)) });
             elements.splice(idx, 1);
             selectedElement = null;
+            selectedElements.clear();
             updateElementList();
             redraw();
         }
         
         function deleteSelected() {
-            if (selectedElement !== null) {
+            if (selectedElements.size > 0) {
+                // Delete multiple selected elements (from highest index to lowest)
+                const indices = Array.from(selectedElements).sort((a, b) => b - a);
+                indices.forEach(idx => {
+                    const element = elements[idx];
+                    undoStack.push({ type: 'delete', index: idx, element: JSON.parse(JSON.stringify(element)) });
+                    elements.splice(idx, 1);
+                });
+                selectedElements.clear();
+            } else if (selectedElement !== null) {
                 removeElement(selectedElement);
             }
+            updateElementList();
+            redraw();
         }
         
         function updateSelectedStroke() {
-            if (selectedElement !== null) {
-                const strokeWidth = parseInt(document.getElementById('strokeWidth').value);
+            const strokeWidth = parseInt(document.getElementById('strokeWidth').value);
+            
+            if (selectedElements.size > 0) {
+                selectedElements.forEach(idx => {
+                    elements[idx].strokeWidth = strokeWidth;
+                });
+            } else if (selectedElement !== null) {
                 elements[selectedElement].strokeWidth = strokeWidth;
-                redraw();
             }
+            redraw();
+        }
+        
+        function undo() {
+            if (undoStack.length === 0) return;
+            
+            const action = undoStack.pop();
+            
+            if (action.type === 'create') {
+                // Remove the created element
+                elements.splice(action.index, 1);
+                selectedElement = null;
+            } else if (action.type === 'delete') {
+                // Restore the deleted element
+                elements.splice(action.index, 0, action.element);
+            } else if (action.type === 'move') {
+                // Restore previous state of element
+                elements[action.index] = JSON.parse(JSON.stringify(action.before));
+            } else if (action.type === 'multi-move') {
+                // Restore previous states of multiple elements
+                action.states.forEach((state, idx) => {
+                    elements[idx] = JSON.parse(JSON.stringify(state));
+                });
+            }
+            
+            updateElementList();
+            redraw();
         }
         
         function clearDrawing() {
             if (confirm('Clear all drawing elements?')) {
                 elements = [];
                 selectedElement = null;
+                selectedElements.clear();
                 updateElementList();
                 redraw();
             }
@@ -1190,6 +1501,8 @@
             
             pins = comp.pins ? JSON.parse(JSON.stringify(comp.pins)) : [];
             elements = parseSVGToElements(comp.svg);
+            selectedElement = null;
+            selectedElements.clear();
             
             updateComponentList();
             updatePinList();
