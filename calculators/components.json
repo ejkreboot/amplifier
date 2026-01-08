@@ -18,12 +18,20 @@
 				"position": {
 					"x": 6,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 6,
+					"y": 20
 				}
 			},
 			{
 				"id": "2",
 				"name": "B",
 				"position": {
+					"x": 54,
+					"y": 20
+				},
+				"labelPosition": {
 					"x": 54,
 					"y": 20
 				}
@@ -72,12 +80,20 @@
 				"position": {
 					"x": 0,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 20
 				}
 			},
 			{
 				"id": "2",
 				"name": "B",
 				"position": {
+					"x": 80,
+					"y": 20
+				},
+				"labelPosition": {
 					"x": 80,
 					"y": 20
 				}
@@ -127,6 +143,10 @@
 				"position": {
 					"x": 20,
 					"y": 0
+				},
+				"labelPosition": {
+					"x": 20,
+					"y": 0
 				}
 			}
 		],
@@ -173,12 +193,20 @@
 				"position": {
 					"x": 0,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 20
 				}
 			},
 			{
 				"id": "2",
 				"name": "-",
 				"position": {
+					"x": 80,
+					"y": 20
+				},
+				"labelPosition": {
 					"x": 80,
 					"y": 20
 				}
@@ -227,12 +255,20 @@
 				"position": {
 					"x": 40,
 					"y": 0
+				},
+				"labelPosition": {
+					"x": 40,
+					"y": 0
 				}
 			},
 			{
 				"id": "2",
 				"name": "-",
 				"position": {
+					"x": 40,
+					"y": 60
+				},
+				"labelPosition": {
 					"x": 40,
 					"y": 60
 				}
@@ -285,12 +321,20 @@
 				"position": {
 					"x": 0,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 20
 				}
 			},
 			{
 				"id": "2",
 				"name": "K",
 				"position": {
+					"x": 80,
+					"y": 20
+				},
+				"labelPosition": {
 					"x": 80,
 					"y": 20
 				}
@@ -343,12 +387,20 @@
 				"position": {
 					"x": 0,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 20
 				}
 			},
 			{
 				"id": "2",
 				"name": "K",
 				"position": {
+					"x": 80,
+					"y": 20
+				},
+				"labelPosition": {
 					"x": 80,
 					"y": 20
 				}
@@ -397,12 +449,20 @@
 				"position": {
 					"x": 0,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 20
 				}
 			},
 			{
 				"id": "2",
 				"name": "B",
 				"position": {
+					"x": 80,
+					"y": 20
+				},
+				"labelPosition": {
 					"x": 80,
 					"y": 20
 				}
@@ -455,6 +515,10 @@
 				"position": {
 					"x": 60,
 					"y": 0
+				},
+				"labelPosition": {
+					"x": 60,
+					"y": 0
 				}
 			},
 			{
@@ -463,12 +527,20 @@
 				"position": {
 					"x": 0,
 					"y": 40
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 40
 				}
 			},
 			{
 				"id": "3",
 				"name": "E",
 				"position": {
+					"x": 60,
+					"y": 90
+				},
+				"labelPosition": {
 					"x": 60,
 					"y": 90
 				}
@@ -521,6 +593,10 @@
 				"position": {
 					"x": 30,
 					"y": 35
+				},
+				"labelPosition": {
+					"x": 30,
+					"y": 35
 				}
 			},
 			{
@@ -529,12 +605,20 @@
 				"position": {
 					"x": 5,
 					"y": 20
+				},
+				"labelPosition": {
+					"x": 5,
+					"y": 20
 				}
 			},
 			{
 				"id": "3",
 				"name": "E",
 				"position": {
+					"x": 30,
+					"y": 5
+				},
+				"labelPosition": {
 					"x": 30,
 					"y": 5
 				}
@@ -587,6 +671,10 @@
 				"position": {
 					"x": 60,
 					"y": 0
+				},
+				"labelPosition": {
+					"x": 60,
+					"y": 0
 				}
 			},
 			{
@@ -595,12 +683,20 @@
 				"position": {
 					"x": 0,
 					"y": 40
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 40
 				}
 			},
 			{
 				"id": "3",
 				"name": "S",
 				"position": {
+					"x": 60,
+					"y": 80
+				},
+				"labelPosition": {
 					"x": 60,
 					"y": 80
 				}
@@ -653,6 +749,10 @@
 				"position": {
 					"x": 60,
 					"y": 80
+				},
+				"labelPosition": {
+					"x": 60,
+					"y": 80
 				}
 			},
 			{
@@ -661,12 +761,20 @@
 				"position": {
 					"x": 0,
 					"y": 40
+				},
+				"labelPosition": {
+					"x": 0,
+					"y": 40
 				}
 			},
 			{
 				"id": "3",
 				"name": "S",
 				"position": {
+					"x": 60,
+					"y": 0
+				},
+				"labelPosition": {
 					"x": 60,
 					"y": 0
 				}

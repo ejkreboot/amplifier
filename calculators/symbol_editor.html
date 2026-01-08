@@ -235,6 +235,7 @@
             gap: 16px;
             min-height: 600px;
             max-height: 600px;
+            overflow: hidden;
         }
 
         .toolbar {
@@ -279,6 +280,8 @@
             display: flex;
             gap: 16px;
             align-items: stretch;
+            flex: 1;
+            min-height: 0;
         }
 
         .canvas-main {
@@ -287,6 +290,7 @@
             flex-direction: column;
             gap: 10px;
             order: 1;
+            min-height: 0;
         }
 
         .canvas-wrapper {
@@ -295,11 +299,10 @@
             border-radius: 0;
             overflow: hidden;
             position: relative;
-            min-height: 500px;
-            max-height: 500px;
             border: 1px solid #d0d0d0;
             box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-            position: relative;
+            min-height: 0;
+            height: 100%;
         }
 
         #canvas {
@@ -479,6 +482,7 @@
         }
 
         .pin-coords input,
+        .pin-label-coords input,
         .element-coords input {
             width: 50px;
             padding: 4px;
@@ -487,6 +491,19 @@
             background: #fff;
             color: #222;
             font-size: 11px;
+        }
+
+        .pin-label-coords {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            font-size: 10px;
+            color: #666;
+        }
+
+        .pin-label-coords span {
+            min-width: 50px;
         }
 
         .label-coords {
@@ -823,9 +840,12 @@
         let multiDragReference = null; // Reference element info for snapping multi-drag
         let draggingPinIndex = null;
         let pinDragOffset = null;
+        let draggingPinLabelIndex = null;
+        let pinLabelDragOffset = null;
         let zoomLevel = 3;
         const MIN_ZOOM = 1;
         const MAX_ZOOM = 10;
+        const DEFAULT_PIN_LABEL_OFFSET = { x: 12, y: -12 };
 
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -1320,9 +1340,6 @@
 
         function drawPreviewPins(ctx, transform) {
             ctx.save();
-            ctx.font = '9px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
             pins.forEach(pin => {
                 const pos = projectPointForPreview(pin.position, transform);
                 ctx.fillStyle = '#ff6600';
@@ -1330,7 +1347,17 @@
                 ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = '#fff';
+                ctx.font = '9px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
                 ctx.fillText(pin.id, pos.x, pos.y);
+
+                const labelProjected = projectPointForPreview(getPinLabelPosition(pin), transform);
+                ctx.fillStyle = '#111';
+                ctx.font = '8px monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(pin.name || pin.id, labelProjected.x, labelProjected.y);
             });
             ctx.restore();
         }
@@ -1545,6 +1572,19 @@
             ctx.strokeRect(offsetX, offsetY, compWidth * zoom, compHeight * zoom);
             ctx.setLineDash([]);
 
+            // Anchor marker at bounding box center
+            const anchorX = offsetX + (compWidth * zoom) / 2;
+            const anchorY = offsetY + (compHeight * zoom) / 2;
+            const anchorHalfSize = Math.max(4, Math.min(12, 6 * zoom)) / 2;
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(anchorX - anchorHalfSize, anchorY - anchorHalfSize);
+            ctx.lineTo(anchorX + anchorHalfSize, anchorY + anchorHalfSize);
+            ctx.moveTo(anchorX - anchorHalfSize, anchorY + anchorHalfSize);
+            ctx.lineTo(anchorX + anchorHalfSize, anchorY - anchorHalfSize);
+            ctx.stroke();
+
             // Draw origin marker
             ctx.fillStyle = '#666';
             ctx.beginPath();
@@ -1571,6 +1611,15 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(pin.id, pos.x, pos.y);
+
+                const labelPos = getPinLabelPosition(pin);
+                const labelCanvas = componentToCanvas(labelPos.x, labelPos.y);
+                const fontSize = Math.max(9, Math.min(18, 10 + zoom * 1.2));
+                ctx.fillStyle = '#111';
+                ctx.font = `${fontSize}px monospace`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(pin.name || pin.id, labelCanvas.x, labelCanvas.y);
             });
 
             // Draw polygon in progress
@@ -1727,11 +1776,29 @@
             multiDragReference = null;
 
             if (mode === 'select') {
+                const labelIndex = findPinLabelNearPosition(pos);
+                if (labelIndex !== -1) {
+                    draggingPinLabelIndex = labelIndex;
+                    const labelPos = getPinLabelPosition(pins[labelIndex]);
+                    pinLabelDragOffset = {
+                        x: labelPos.x - pos.x,
+                        y: labelPos.y - pos.y
+                    };
+                    undoStack.push({
+                        type: 'move-pin-label',
+                        index: labelIndex,
+                        before: { x: labelPos.x, y: labelPos.y }
+                    });
+                    return;
+                }
                 const pinIndex = findPinNearPosition(pos);
                 if (pinIndex !== -1) {
                     draggingPinIndex = pinIndex;
                     const pin = pins[pinIndex];
-                    const beforePosition = { x: pin.position.x, y: pin.position.y };
+                    const beforePosition = {
+                        position: { x: pin.position.x, y: pin.position.y },
+                        label: getPinLabelPosition(pin)
+                    };
                     pinDragOffset = {
                         x: pin.position.x - pos.x,
                         y: pin.position.y - pos.y
@@ -1849,6 +1916,11 @@
             const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
 
             coordIndicator.textContent = `X: ${pos.x.toFixed(2)}, Y: ${pos.y.toFixed(2)}`;
+
+            if (draggingPinLabelIndex !== null) {
+                applyPinLabelDragPosition(pos);
+                return;
+            }
 
             if (draggingPinIndex !== null) {
                 applyPinDragPosition(pos);
@@ -2041,12 +2113,27 @@
         }
 
         function onMouseUp(e) {
+            if (draggingPinLabelIndex !== null) {
+                const pin = pins[draggingPinLabelIndex];
+                const lastAction = undoStack[undoStack.length - 1];
+                if (lastAction && lastAction.type === 'move-pin-label') {
+                    const before = lastAction.before;
+                    const labelPos = pin ? getPinLabelPosition(pin) : null;
+                    if (!labelPos || (labelPos.x === before.x && labelPos.y === before.y)) {
+                        undoStack.pop();
+                    }
+                }
+                updatePinList();
+                redraw();
+                resetPinLabelDragState();
+                return;
+            }
             if (draggingPinIndex !== null) {
                 const pin = pins[draggingPinIndex];
                 const lastAction = undoStack[undoStack.length - 1];
                 if (lastAction && lastAction.type === 'move-pin') {
                     const before = lastAction.before;
-                    if (!pin || (pin.position.x === before.x && pin.position.y === before.y)) {
+                    if (!pin || (pin.position.x === before.position.x && pin.position.y === before.position.y)) {
                         undoStack.pop();
                     }
                 }
@@ -2367,6 +2454,19 @@
             return -1;
         }
 
+        function findPinLabelNearPosition(pos) {
+            if (!pos || !pins.length) return -1;
+            const threshold = getHitThreshold(6, { min: 2, max: 12 });
+            for (let i = pins.length - 1; i >= 0; i--) {
+                const labelPos = getPinLabelPosition(pins[i]);
+                const dist = Math.hypot(labelPos.x - pos.x, labelPos.y - pos.y);
+                if (dist <= threshold) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         function getElementReferencePoint(el) {
             if (!el) return { x: 0, y: 0 };
             if (el.type === 'line') return { x: el.x1, y: el.y1 };
@@ -2389,8 +2489,33 @@
                 targetX = Math.round(targetX / gridSize) * gridSize;
                 targetY = Math.round(targetY / gridSize) * gridSize;
             }
+            const deltaX = targetX - pin.position.x;
+            const deltaY = targetY - pin.position.y;
             pin.position.x = targetX;
             pin.position.y = targetY;
+            const label = ensurePinLabelPosition(pin);
+            label.x = Math.round(label.x + deltaX);
+            label.y = Math.round(label.y + deltaY);
+            updatePinList();
+            redraw();
+            markCurrentComponentDirty();
+        }
+
+        function applyPinLabelDragPosition(pos) {
+            if (draggingPinLabelIndex === null) return;
+            const pin = pins[draggingPinLabelIndex];
+            if (!pin || !pos) return;
+            const label = ensurePinLabelPosition(pin);
+            const gridSize = parseInt(document.getElementById('gridSize').value, 10) || 1;
+            const snapToGrid = document.getElementById('snapToGrid').checked;
+            let targetX = pos.x + (pinLabelDragOffset?.x || 0);
+            let targetY = pos.y + (pinLabelDragOffset?.y || 0);
+            if (snapToGrid) {
+                targetX = Math.round(targetX / gridSize) * gridSize;
+                targetY = Math.round(targetY / gridSize) * gridSize;
+            }
+            label.x = Math.round(targetX);
+            label.y = Math.round(targetY);
             updatePinList();
             redraw();
             markCurrentComponentDirty();
@@ -2401,14 +2526,61 @@
             pinDragOffset = null;
         }
 
+        function resetPinLabelDragState() {
+            draggingPinLabelIndex = null;
+            pinLabelDragOffset = null;
+        }
+
+        function getDefaultPinLabelPosition(pin) {
+            const source = pin?.position || { x: 0, y: 0 };
+            return {
+                x: Math.round(source.x + DEFAULT_PIN_LABEL_OFFSET.x),
+                y: Math.round(source.y + DEFAULT_PIN_LABEL_OFFSET.y)
+            };
+        }
+
+        function ensurePinLabelPosition(pin) {
+            if (!pin) return { x: 0, y: 0 };
+            if (!pin.labelPosition || !Number.isFinite(pin.labelPosition.x) || !Number.isFinite(pin.labelPosition.y)) {
+                pin.labelPosition = getDefaultPinLabelPosition(pin);
+            }
+            return pin.labelPosition;
+        }
+
+        function getPinLabelPosition(pin) {
+            const label = ensurePinLabelPosition(pin);
+            return { x: label.x, y: label.y };
+        }
+
+        function normalizePin(pin, index) {
+            const baseId = pin?.id || String(index + 1);
+            const x = Number.isFinite(pin?.position?.x) ? pin.position.x : 0;
+            const y = Number.isFinite(pin?.position?.y) ? pin.position.y : 0;
+            const normalized = {
+                id: baseId,
+                name: pin?.name || baseId,
+                position: { x, y }
+            };
+            const labelSource = pin?.labelPosition;
+            const labelX = Number.isFinite(labelSource?.x) ? labelSource.x : x + DEFAULT_PIN_LABEL_OFFSET.x;
+            const labelY = Number.isFinite(labelSource?.y) ? labelSource.y : y + DEFAULT_PIN_LABEL_OFFSET.y;
+            normalized.labelPosition = { x: Math.round(labelX), y: Math.round(labelY) };
+            return normalized;
+        }
+
+        function normalizePins(pinList) {
+            if (!Array.isArray(pinList)) return [];
+            return pinList.map((pin, index) => normalizePin(pin, index));
+        }
+
         // Pin management
         function addPin(pos) {
             const id = (pins.length + 1).toString();
-            pins.push({
+            pins.push(normalizePin({
                 id,
                 name: id,
                 position: { x: pos.x, y: pos.y }
-            });
+            }, pins.length));
             updatePinList();
             redraw();
             markCurrentComponentDirty();
@@ -2416,11 +2588,11 @@
 
         function addPinManual() {
             const id = (pins.length + 1).toString();
-            pins.push({
+            pins.push(normalizePin({
                 id,
                 name: id,
                 position: { x: 0, y: 0 }
-            });
+            }, pins.length));
             updatePinList();
             redraw();
             markCurrentComponentDirty();
@@ -2428,29 +2600,53 @@
 
         function updatePinList() {
             const container = document.getElementById('pinList');
-            container.innerHTML = pins.map((pin, idx) => `
+            container.innerHTML = pins.map((pin, idx) => {
+                const labelPos = getPinLabelPosition(pin);
+                return `
                 <div class="pin-item">
                     <div class="pin-header">
                         <span>Pin ${pin.id}: ${pin.name}</span>
                         <button class="btn btn-danger small-btn" onclick="removePin(${idx})">×</button>
                     </div>
                     <div class="pin-coords">
-                        <input type="text" value="${pin.name}" placeholder="Name" onchange="updatePin(${idx}, 'name', this.value)">
+                        <input type="text" value="${pin.name}" placeholder="Name" onchange="updatePin(${idx}, 'name', this.value)"> 
                         <input type="number" value="${pin.position.x}" onchange="updatePin(${idx}, 'x', this.value)">
                         <input type="number" value="${pin.position.y}" onchange="updatePin(${idx}, 'y', this.value)">
                     </div>
+                    <div class="pin-label-coords">
+                        <span>Label</span>
+                        <input type="number" value="${labelPos.x}" onchange="updatePin(${idx}, 'labelX', this.value)">
+                        <input type="number" value="${labelPos.y}" onchange="updatePin(${idx}, 'labelY', this.value)">
+                    </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function updatePin(idx, prop, value) {
+            const pin = pins[idx];
+            if (!pin) return;
             if (prop === 'name') {
-                pins[idx].name = value;
-            } else if (prop === 'x') {
-                pins[idx].position.x = parseInt(value);
-            } else if (prop === 'y') {
-                pins[idx].position.y = parseInt(value);
+                pin.name = value;
+            } else if (prop === 'x' || prop === 'y') {
+                const parsed = parseInt(value, 10);
+                if (!Number.isFinite(parsed)) return;
+                const axis = prop === 'x' ? 'x' : 'y';
+                const delta = parsed - pin.position[axis];
+                pin.position[axis] = parsed;
+                const label = ensurePinLabelPosition(pin);
+                label[axis] = Math.round(label[axis] + delta);
+            } else if (prop === 'labelX' || prop === 'labelY') {
+                const parsed = parseInt(value, 10);
+                if (!Number.isFinite(parsed)) return;
+                const label = ensurePinLabelPosition(pin);
+                if (prop === 'labelX') {
+                    label.x = parsed;
+                } else {
+                    label.y = parsed;
+                }
             }
+            updatePinList();
             redraw();
             markCurrentComponentDirty();
         }
@@ -2589,7 +2785,18 @@
             } else if (action.type === 'move-pin') {
                 const pin = pins[action.index];
                 if (pin && action.before) {
-                    pin.position = { x: action.before.x, y: action.before.y };
+                    pin.position = { x: action.before.position.x, y: action.before.position.y };
+                    const label = ensurePinLabelPosition(pin);
+                    label.x = action.before.label.x;
+                    label.y = action.before.label.y;
+                }
+                updatePinList();
+            } else if (action.type === 'move-pin-label') {
+                const pin = pins[action.index];
+                if (pin && action.before) {
+                    const label = ensurePinLabelPosition(pin);
+                    label.x = action.before.x;
+                    label.y = action.before.y;
                 }
                 updatePinList();
             }
@@ -2735,7 +2942,7 @@
             document.getElementById('modelName').value = comp.model?.name || '';
             document.getElementById('modelDef').value = comp.model?.definition || '';
 
-            pins = comp.pins ? JSON.parse(JSON.stringify(comp.pins)) : [];
+            pins = normalizePins(comp.pins);
             elements = parseSVGToElements(comp.svg);
             setLabelInputs(comp.labels, compWidthValue, compHeightValue);
             selectedElement = null;
@@ -3052,11 +3259,15 @@
                     width: compWidth,
                     height: compHeight
                 },
-                pins: pins.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    position: { x: p.position.x, y: p.position.y }
-                })),
+                pins: pins.map(p => {
+                    const label = ensurePinLabelPosition(p);
+                    return {
+                        id: p.id,
+                        name: p.name,
+                        position: { x: p.position.x, y: p.position.y },
+                        labelPosition: { x: Math.round(label.x), y: Math.round(label.y) }
+                    };
+                }),
                 labels,
                 svg: elementsToSVG()
             };
