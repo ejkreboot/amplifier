@@ -48,8 +48,8 @@
         .components-panel {
             grid-column: 1;
             grid-row: 1;
-            min-height: 650px;
-            max-height: 650px;
+            min-height: 600px;
+            max-height: 600px;
         }
 
         .canvas-panel {
@@ -189,8 +189,8 @@
             display: flex;
             flex-direction: column;
             gap: 16px;
-            min-height: 650px;
-            max-height: 650px;
+            min-height: 600px;
+            max-height: 600px;
         }
         
         .toolbar {
@@ -216,7 +216,7 @@
         }
         
         .toolbar input[type="number"] {
-            width: 60px;
+            width: 48px;
             padding: 4px 8px;
             border: 1px solid #999;
             border-radius: 0;
@@ -227,13 +227,14 @@
         .canvas-layout {
             display: flex;
             gap: 16px;
-            align-items: flex-start;
+            align-items: stretch;
         }
         .canvas-main {
             flex: 1;
             display: flex;
             flex-direction: column;
             gap: 10px;
+            order: 1;
         }
         .canvas-wrapper {
             flex: 1;
@@ -270,12 +271,19 @@
             gap: 12px;
             width: 220px;
             flex-shrink: 0;
+            order: 2;
+            height: 100%;
+            min-height: 0;
         }
         
         .label-preview {
-            border: 1px solid #d0d0d0;
-            background: #fafafa;
-            padding: 8px;
+            border: 1px solid #d8d8d8;
+            background: transparent;
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         
         .label-preview-title {
@@ -291,10 +299,11 @@
         
         .label-preview canvas {
             width: 100%;
-            height: 140px;
-            border: 1px solid #e0e0e0;
+            height: 100%;
+            border: none;
             background: #fff;
             display: block;
+            flex: 1;
         }
         
         .label-chip {
@@ -532,6 +541,13 @@
                     <span class="material-symbols-outlined">line_end_circle</span>
                 </button>
                 <div class="separator"></div>
+                <button class="btn btn-secondary btn-icon" onclick="deleteSelected()" title="Delete Selected">
+                    <span class="material-symbols-outlined">backspace</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="clearDrawing()" title="Clear All">
+                    <span class="material-symbols-outlined">delete_sweep</span>
+                </button>
+                <div class="separator"></div>
                 <label>Stroke:</label>
                 <input type="number" id="strokeWidth" value="4" min="1" max="10" onchange="updateSelectedStroke()">
                 <input type="checkbox" id="filled" style="margin-left: 10px;">
@@ -565,14 +581,6 @@
                     <div class="canvas-wrapper">
                         <canvas id="canvas"></canvas>
                         <div class="canvas-info" id="canvasInfo">x: 0, y: 0</div>
-                    </div>
-                    <div class="toolbar">
-                        <button class="btn btn-secondary btn-icon" onclick="deleteSelected()" title="Delete Selected">
-                            <span class="material-symbols-outlined">backspace</span>
-                        </button>
-                        <button class="btn btn-secondary btn-icon" onclick="clearDrawing()" title="Clear All">
-                            <span class="material-symbols-outlined">delete_sweep</span>
-                        </button>
                     </div>
                 </div>
             </div>
