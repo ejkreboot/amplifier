@@ -223,6 +223,13 @@
             background: #fff;
             color: #222;
         }
+
+        .zoom-indicator {
+            font-size: 10px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
         
         .canvas-layout {
             display: flex;
@@ -246,6 +253,7 @@
             max-height: 500px;
             border: 1px solid #d0d0d0;
             box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+            position: relative;
         }
         
         #canvas {
@@ -263,6 +271,9 @@
             color: #999;
             pointer-events: none;
             font-family: monospace;
+            display: flex;
+            gap: 12px;
+            text-transform: uppercase;
         }
 
         .label-preview-section {
@@ -551,14 +562,12 @@
                 <label>Stroke:</label>
                 <input type="number" id="strokeWidth" value="4" min="1" max="10" onchange="updateSelectedStroke()">
                 <input type="checkbox" id="filled" style="margin-left: 10px;">
-                <label for="filled">Filled</label>
+                <label for="filled">Fill</label>
                 <div class="separator"></div>
                 <label>Grid:</label>
                 <input type="number" id="gridSize" value="5" min="1" max="20" onchange="redraw()">
                 <input type="checkbox" id="snapToGrid" checked style="margin-left: 10px;">
                 <label for="snapToGrid" style="min-width: auto;">Snap</label>
-                <label>Zoom:</label>
-                <input type="number" id="zoomLevel" value="3" min="1" max="10" step="0.5" onchange="redraw()">
             </div>
             <div class="canvas-layout">
                 <div class="label-preview-section">
@@ -719,17 +728,69 @@
         let undoStack = []; // Stack of actions for undo
         let originalElementState = null; // Element state at start of drag
         let originalElementStates = new Map(); // Map of element states for multi-drag
+        let zoomLevel = 3;
+        const MIN_ZOOM = 1;
+        const MAX_ZOOM = 10;
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const zoomIndicator = document.createElement('span');
+        zoomIndicator.className = 'zoom-indicator';
+        const coordIndicator = document.createElement('span');
+        coordIndicator.className = 'zoom-indicator';
+        coordIndicator.textContent = 'X: 0.00, Y: 0.00';
         const labelPreviewCanvases = [
             { canvas: document.getElementById('labelPreview0'), orientation: 0 },
             { canvas: document.getElementById('labelPreview90'), orientation: 90 }
-        ].map(entry => ({
-            ...entry,
-            ctx: entry.canvas ? entry.canvas.getContext('2d') : null
-        }));
+        ].map(entry => {
+            const previewCanvas = entry.canvas;
+            const preview = {
+                ...entry,
+                canvas: previewCanvas,
+                ctx: previewCanvas ? previewCanvas.getContext('2d') : null,
+                markerTargets: [],
+                transform: null
+            };
+            if (previewCanvas) {
+                previewCanvas.style.touchAction = 'none';
+                previewCanvas.addEventListener('pointerdown', (event) => handleLabelPreviewPointerDown(preview, event));
+                previewCanvas.addEventListener('pointermove', (event) => handleLabelPreviewPointerMove(preview, event));
+                previewCanvas.addEventListener('pointerup', (event) => handleLabelPreviewPointerUp(preview, event));
+                previewCanvas.addEventListener('pointerleave', (event) => handleLabelPreviewPointerUp(preview, event));
+                previewCanvas.addEventListener('pointercancel', (event) => handleLabelPreviewPointerUp(preview, event));
+            }
+            return preview;
+        });
         let labelPreviewDirty = false;
+        let labelDragState = null;
+
+        function clampZoom(value) {
+            return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+        }
+
+        function updateZoomIndicator() {
+            if (!zoomIndicator) return;
+            zoomIndicator.textContent = 'Zoom: ' + zoomLevel.toFixed(1) + 'x';
+        }
+
+        function setZoomLevel(value, options = {}) {
+            const clamped = clampZoom(value);
+            if (!options.force && Math.abs(clamped - zoomLevel) < 0.001) return;
+            zoomLevel = clamped;
+            updateZoomIndicator();
+            redraw();
+        }
+
+        function onCanvasWheel(event) {
+            const pinchGesture = event.ctrlKey || event.metaKey;
+            const trackpadScrollGesture = !pinchGesture && event.deltaMode === 0;
+            if (!pinchGesture && !trackpadScrollGesture) return;
+            event.preventDefault();
+            const multiplier = pinchGesture ? 0.01 : 0.0025;
+            const increment = -event.deltaY * multiplier;
+            if (increment === 0) return;
+            setZoomLevel(zoomLevel + increment);
+        }
         
         // Initialize
         function init() {
@@ -742,6 +803,13 @@
             canvas.addEventListener('mousemove', onMouseMove);
             canvas.addEventListener('mouseup', onMouseUp);
             canvas.addEventListener('dblclick', onDoubleClick);
+            canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+            const info = document.getElementById('canvasInfo');
+            if (info) {
+                info.innerHTML = '';
+                info.appendChild(zoomIndicator);
+                info.appendChild(coordIndicator);
+            }
             
             // Keyboard shortcuts
             window.addEventListener('keydown', (e) => {
@@ -761,6 +829,7 @@
             window.addEventListener('mouseup', () => flushLabelPreviewUpdates());
             loadDefaultComponents();
             requestLabelPreviewUpdate({ immediate: true });
+            updateZoomIndicator();
         }
         
         function loadDefaultComponents() {
@@ -865,7 +934,7 @@
         
         // Canvas coordinate helpers
         function getCanvasOffset() {
-            const zoom = parseFloat(document.getElementById('zoomLevel').value);
+            const zoom = zoomLevel;
             const compWidth = parseInt(document.getElementById('compWidth').value) || 80;
             const compHeight = parseInt(document.getElementById('compHeight').value) || 40;
             
@@ -992,7 +1061,14 @@
                 canvas.height,
                 extraPoints
             );
-            if (!transform) return;
+            if (!transform) {
+                preview.transform = null;
+                preview.markerTargets = [];
+                return;
+            }
+
+            preview.transform = transform;
+            preview.markerTargets = [];
 
             // Draw component boundary
             ctx.save();
@@ -1014,8 +1090,17 @@
             const defaultInput = document.getElementById('compDefault');
             const prefixText = (prefixInput?.value || '').trim() || 'DES';
             const defaultText = (defaultInput?.value || '').trim() || 'VAL';
-            drawLabelMarker(ctx, designator, transform, '#1e88e5', prefixText);
-            drawLabelMarker(ctx, value, transform, '#43a047', defaultText);
+            const orientationIndex = orientation === 0 ? 0 : 1;
+            drawLabelMarker(ctx, designator, transform, '#1e88e5', prefixText, {
+                preview,
+                labelType: 'designator',
+                orientationIndex
+            });
+            drawLabelMarker(ctx, value, transform, '#43a047', defaultText, {
+                preview,
+                labelType: 'value',
+                orientationIndex
+            });
         }
 
         function drawPreviewOrigin(ctx, transform) {
@@ -1049,7 +1134,7 @@
                     ctx.beginPath();
                     ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
                     if (el.filled) {
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                        ctx.fillStyle = '#000';
                         ctx.fill();
                     }
                     ctx.stroke();
@@ -1073,7 +1158,7 @@
                         pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
                         ctx.closePath();
                         if (el.filled) {
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+                            ctx.fillStyle = '#000';
                             ctx.fill();
                         }
                         ctx.stroke();
@@ -1108,7 +1193,7 @@
             ctx.restore();
         }
 
-        function drawLabelMarker(ctx, point, transform, color, label) {
+        function drawLabelMarker(ctx, point, transform, color, label, options = {}) {
             if (!point) return;
             const projected = projectPointForPreview(point, transform, false);
             ctx.save();
@@ -1121,6 +1206,96 @@
             ctx.textBaseline = 'middle';
             ctx.fillText(label, projected.x + 6, projected.y);
             ctx.restore();
+            if (options.preview && options.preview.markerTargets) {
+                options.preview.markerTargets.push({
+                    type: options.labelType,
+                    orientationIndex: options.orientationIndex,
+                    canvasPosition: { x: projected.x, y: projected.y }
+                });
+            }
+        }
+
+        const LABEL_MARKER_HIT_RADIUS = 10;
+
+        function getPreviewCanvasPoint(canvasElement, event) {
+            if (!canvasElement) return null;
+            const rect = canvasElement.getBoundingClientRect();
+            const scaleX = canvasElement.width / rect.width;
+            const scaleY = canvasElement.height / rect.height;
+            return {
+                x: (event.clientX - rect.left) * scaleX,
+                y: (event.clientY - rect.top) * scaleY
+            };
+        }
+
+        function previewCanvasPointToComponent(preview, point) {
+            if (!preview || !preview.transform || !point) return null;
+            const transform = preview.transform;
+            if (!transform.scale) return null;
+            const normalizedX = (point.x - transform.offsetX) / transform.scale;
+            const normalizedY = (point.y - transform.offsetY) / transform.scale;
+            return {
+                x: Math.round(normalizedX + transform.bounds.minX),
+                y: Math.round(normalizedY + transform.bounds.minY)
+            };
+        }
+
+        function setLabelPositionFromPreview(labelType, orientationIndex, position) {
+            if (!position) return;
+            const prefix = labelType === 'value' ? 'valueLabel' : 'designatorLabel';
+            const suffix = orientationIndex === 0 ? '0' : '90';
+            const xInput = document.getElementById(prefix + suffix + 'X');
+            const yInput = document.getElementById(prefix + suffix + 'Y');
+            const roundedX = Math.round(position.x);
+            const roundedY = Math.round(position.y);
+            if (xInput) xInput.value = roundedX;
+            if (yInput) yInput.value = roundedY;
+        }
+
+        function updateLabelPositionFromCanvasPoint(preview, dragState, canvasPoint) {
+            if (!dragState) return;
+            const componentPoint = previewCanvasPointToComponent(preview, canvasPoint);
+            if (!componentPoint) return;
+            setLabelPositionFromPreview(dragState.labelType, dragState.orientationIndex, componentPoint);
+            requestLabelPreviewUpdate({ immediate: true });
+        }
+
+        function handleLabelPreviewPointerDown(preview, event) {
+            if (!preview?.canvas || !preview.markerTargets?.length) return;
+            const canvasPoint = getPreviewCanvasPoint(preview.canvas, event);
+            if (!canvasPoint) return;
+            const hit = preview.markerTargets.find(target => {
+                const dx = canvasPoint.x - target.canvasPosition.x;
+                const dy = canvasPoint.y - target.canvasPosition.y;
+                return Math.hypot(dx, dy) <= LABEL_MARKER_HIT_RADIUS;
+            });
+            if (!hit) return;
+            event.preventDefault();
+            labelDragState = {
+                preview,
+                pointerId: event.pointerId,
+                labelType: hit.type,
+                orientationIndex: hit.orientationIndex
+            };
+            preview.canvas.setPointerCapture(event.pointerId);
+            updateLabelPositionFromCanvasPoint(preview, labelDragState, canvasPoint);
+        }
+
+        function handleLabelPreviewPointerMove(preview, event) {
+            if (!labelDragState || labelDragState.preview !== preview || labelDragState.pointerId !== event.pointerId) return;
+            event.preventDefault();
+            const canvasPoint = getPreviewCanvasPoint(preview.canvas, event);
+            if (!canvasPoint) return;
+            updateLabelPositionFromCanvasPoint(preview, labelDragState, canvasPoint);
+        }
+
+        function handleLabelPreviewPointerUp(preview, event) {
+            if (!labelDragState || labelDragState.preview !== preview || labelDragState.pointerId !== event.pointerId) return;
+            if (preview.canvas?.hasPointerCapture?.(event.pointerId)) {
+                preview.canvas.releasePointerCapture(event.pointerId);
+            }
+            event.preventDefault();
+            labelDragState = null;
         }
 
         function createPreviewTransform(width, height, angle, canvasWidth, canvasHeight, extraPoints = []) {
@@ -1507,7 +1682,7 @@
             const shouldSnap = mode !== 'select';
             const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
             
-            document.getElementById('canvasInfo').textContent = `x: ${pos.x}, y: ${pos.y}`;
+            coordIndicator.textContent = `X: ${pos.x.toFixed(2)}, Y: ${pos.y.toFixed(2)}`;
 
             if (mode === 'arc' && arcStage > 0) {
                 arcPreviewPoint = pos;
