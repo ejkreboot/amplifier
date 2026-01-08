@@ -8,7 +8,7 @@
 			"autoIncrement": true
 		},
 		"size": {
-			"width": 80,
+			"width": 60,
 			"height": 40
 		},
 		"pins": [
@@ -16,7 +16,7 @@
 				"id": "1",
 				"name": "A",
 				"position": {
-					"x": 0,
+					"x": 6,
 					"y": 20
 				}
 			},
@@ -24,22 +24,34 @@
 				"id": "2",
 				"name": "B",
 				"position": {
-					"x": 80,
+					"x": 54,
 					"y": 20
 				}
 			}
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 30,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 52 },
-				{ "x": 92, "y": 20 }
+				{
+					"x": 30,
+					"y": 52
+				},
+				{
+					"x": 72,
+					"y": 20
+				}
 			]
 		},
-		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><path id=\"Resistor\" fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linejoin=\"round\" stroke-linecap=\"round\" d=\"M 0 20 L 35 20 L 40 10 L 50 30 L 60 10 L 70 30 L 80 10 L 90 30 L 95 20 L 120 20\"/></svg>"
+		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 90 60\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M 30 30 L 37 30 M 53 30 L 60 30\"/><circle cx=\"29\" cy=\"30\" r=\"1\" fill=\"none\"/><circle cx=\"61\" cy=\"30\" r=\"1\" fill=\"none\"/><polyline points=\"37,30 38,27 41,33 44,27 46,33 49,27 52,33 53,30 53,30 53,30\" fill=\"none\"/></g></svg>"
 	},
 	"capacitor": {
 		"name": "Capacitor",
@@ -73,12 +85,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 40,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 52 },
-				{ "x": 92, "y": 20 }
+				{
+					"x": 40,
+					"y": 52
+				},
+				{
+					"x": 92,
+					"y": 20
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><g id=\"capacitor\" fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path id=\"path4314-7\" d=\"M 0 20 L 53.333 20\"/><path id=\"path4316-0\" d=\"M 53.306 3.708 L 53.361 38.708\"/><path id=\"path4318-5\" d=\"M 66.639 3.696 L 66.694 38.696\"/><path id=\"path4320-1\" d=\"M 66.667 20 L 120 20\"/></g></svg>"
@@ -108,12 +132,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 20, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 20,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 20, "y": 52 },
-				{ "x": 52, "y": 20 }
+				{
+					"x": 20,
+					"y": 52
+				},
+				{
+					"x": 52,
+					"y": 20
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 80 80\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"2.7596\" stroke-linecap=\"round\"><path d=\"M 40.081 4 L 40.081 41.155\"/><path d=\"M 10.358 41.155 L 69.804 41.155\"/><path d=\"M 19.926 59.151 L 60.235 59.151\"/><path d=\"M 30.902 76 L 49.259 76\"/></g></svg>"
@@ -150,12 +186,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 40,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 52 },
-				{ "x": 92, "y": 20 }
+				{
+					"x": 40,
+					"y": 52
+				},
+				{
+					"x": 92,
+					"y": 20
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\"><path d=\"M 0 20 L 50 20\"/><path d=\"M 50 5 L 50 35\"/><path d=\"M 62 12 L 62 28\"/><path d=\"M 62 20 L 120 20\"/></g></svg>"
@@ -192,12 +240,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 30 }
+				{
+					"x": 40,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 30
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 72 },
-				{ "x": 92, "y": 30 }
+				{
+					"x": 40,
+					"y": 72
+				},
+				{
+					"x": 92,
+					"y": 30
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 80 90\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"3\" stroke-linecap=\"round\"><path d=\"M 40 0 L 40 15\"/><circle cx=\"40\" cy=\"45\" r=\"30\" stroke-width=\"3\"/><path d=\"M 25 45 Q 32.5 30 40 45 Q 47.5 60 55 45\"/><path d=\"M 40 75 L 40 90\"/></g></svg>"
@@ -238,12 +298,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 40,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 52 },
-				{ "x": 92, "y": 20 }
+				{
+					"x": 40,
+					"y": 52
+				},
+				{
+					"x": 92,
+					"y": 20
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M 0 20 L 40 20\"/><polygon points=\"40,8 40,32 70,20\" fill=\"#000000\"/><path d=\"M 70 8 L 70 32\"/><path d=\"M 70 20 L 120 20\"/></g></svg>"
@@ -284,12 +356,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 40,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 52 },
-				{ "x": 92, "y": 20 }
+				{
+					"x": 40,
+					"y": 52
+				},
+				{
+					"x": 92,
+					"y": 20
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M 0 20 L 40 20\"/><polygon points=\"40,8 40,32 70,20\" fill=\"#000000\"/><path d=\"M 70 8 L 70 32\"/><path d=\"M 70 8 L 63 8\"/><path d=\"M 70 32 L 77 32\"/><path d=\"M 70 20 L 120 20\"/></g></svg>"
@@ -326,12 +410,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 40, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 40,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 40, "y": 52 },
-				{ "x": 92, "y": 20 }
+				{
+					"x": 40,
+					"y": 52
+				},
+				{
+					"x": 92,
+					"y": 20
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 120 40\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\"><path d=\"M 0 20 L 20 20\"/><path d=\"M 20 20 Q 30 20 30 10 Q 30 0 40 0 Q 50 0 50 10 Q 50 20 60 20\"/><path d=\"M 60 20 Q 70 20 70 10 Q 70 0 80 0 Q 90 0 90 10 Q 90 20 100 20\"/><path d=\"M 100 20 L 120 20\"/></g></svg>"
@@ -380,12 +476,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 30, "y": -12 },
-				{ "x": -12, "y": 45 }
+				{
+					"x": 30,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 45
+				}
 			],
 			"value": [
-				{ "x": 30, "y": 102 },
-				{ "x": 72, "y": 45 }
+				{
+					"x": 30,
+					"y": 102
+				},
+				{
+					"x": 72,
+					"y": 45
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 80 120\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M 0 60 L 30 60\"/><path d=\"M 30 30 L 30 90\"/><path d=\"M 30 45 L 70 15\"/><path d=\"M 70 15 L 70 0\"/><path d=\"M 30 75 L 70 105\"/><path d=\"M 70 105 L 70 120\"/></g><polygon points=\"70,105 52,97 58,83\" fill=\"#000000\" stroke=\"#000000\" stroke-width=\"2\"/></svg>"
@@ -434,15 +542,27 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 20, "y": -12 },
-				{ "x": -12, "y": 20 }
+				{
+					"x": 20,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 20
+				}
 			],
 			"value": [
-				{ "x": 20, "y": 52 },
-				{ "x": 52, "y": 20 }
+				{
+					"x": 20,
+					"y": 52
+				},
+				{
+					"x": 52,
+					"y": 20
+				}
 			]
 		},
-		"svg":  "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"150px\" height=\"150px\" viewBox=\"0 0 40 40\" xmlns:bx=\"https://boxy-svg.com\"><defs/><path style=\"fill: none; stroke: rgb(0, 0, 0);\" d=\"M 40.004 85.07 L 40 110\" transform=\"matrix(0, 0, 0, 1.2033694196855513, 40, -22.370636165410648)\"/><path d=\"M 42.5 100 L 45 105 L 40 105 L 42.5 100 Z\" style=\"stroke: rgb(0, 0, 0);\" transform=\"matrix(0.422619, -0.906308, 0.906308, 0.422619, -87.509091, 22.007931)\"/><path style=\"fill: none; stroke: rgb(0, 0, 0); stroke-width: 3px;\" d=\"M 19.86 11.004 L 19.86 28.974\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none;\" cx=\"29.863\" cy=\"34.953\" rx=\"1\" ry=\"1\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none; stroke-width: 1px;\" cx=\"29.861\" cy=\"4.911\" rx=\"1\" ry=\"1\"/><path style=\"fill: none; stroke: rgb(0, 0, 0);\" d=\"M 19.866 19.965 L 6.228 19.946\"/><path style=\"fill: none; stroke: rgb(0, 0, 0); stroke-linejoin: round; stroke-linecap: square;\" d=\"M 20.948 14.883 L 29.86 9.946 L 29.86 6.027\"/><path style=\"fill: none; stroke: rgb(0, 0, 0); stroke-linejoin: round;\" d=\"M 29.86 33.795 L 29.86 29.946 L 22.859 26.533\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none;\" cx=\"25.955\" cy=\"20.041\" rx=\"13.095\" ry=\"13.095\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none; stroke-width: 1px;\" cx=\"4.86\" cy=\"20.014\" rx=\"1\" ry=\"1\"/></svg>"
+		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"150px\" height=\"150px\" viewBox=\"0 0 40 40\" xmlns:bx=\"https://boxy-svg.com\"><defs/><path style=\"fill: none; stroke: rgb(0, 0, 0);\" d=\"M 40.004 85.07 L 40 110\" transform=\"matrix(0, 0, 0, 1.2033694196855513, 40, -22.370636165410648)\"/><path d=\"M 42.5 100 L 45 105 L 40 105 L 42.5 100 Z\" style=\"stroke: rgb(0, 0, 0);\" transform=\"matrix(0.422619, -0.906308, 0.906308, 0.422619, -87.509091, 22.007931)\"/><path style=\"fill: none; stroke: rgb(0, 0, 0); stroke-width: 3px;\" d=\"M 19.86 11.004 L 19.86 28.974\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none;\" cx=\"29.863\" cy=\"34.953\" rx=\"1\" ry=\"1\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none; stroke-width: 1px;\" cx=\"29.861\" cy=\"4.911\" rx=\"1\" ry=\"1\"/><path style=\"fill: none; stroke: rgb(0, 0, 0);\" d=\"M 19.866 19.965 L 6.228 19.946\"/><path style=\"fill: none; stroke: rgb(0, 0, 0); stroke-linejoin: round; stroke-linecap: square;\" d=\"M 20.948 14.883 L 29.86 9.946 L 29.86 6.027\"/><path style=\"fill: none; stroke: rgb(0, 0, 0); stroke-linejoin: round;\" d=\"M 29.86 33.795 L 29.86 29.946 L 22.859 26.533\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none;\" cx=\"25.955\" cy=\"20.041\" rx=\"13.095\" ry=\"13.095\"/><ellipse style=\"stroke: rgb(0, 0, 0); fill: none; stroke-width: 1px;\" cx=\"4.86\" cy=\"20.014\" rx=\"1\" ry=\"1\"/></svg>"
 	},
 	"nmos": {
 		"name": "N-Channel MOSFET",
@@ -488,12 +608,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 30, "y": -12 },
-				{ "x": -12, "y": 40 }
+				{
+					"x": 30,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 40
+				}
 			],
 			"value": [
-				{ "x": 30, "y": 92 },
-				{ "x": 72, "y": 40 }
+				{
+					"x": 30,
+					"y": 92
+				},
+				{
+					"x": 72,
+					"y": 40
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 90 120\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M 0 60 L 25 60\"/><path d=\"M 25 30 L 25 90\"/><path d=\"M 35 25 L 35 45\"/><path d=\"M 35 50 L 35 70\"/><path d=\"M 35 75 L 35 95\"/><path d=\"M 35 35 L 70 35\"/><path d=\"M 70 35 L 70 0\"/><path d=\"M 35 85 L 70 85\"/><path d=\"M 70 85 L 70 120\"/><path d=\"M 35 60 L 70 60\"/><path d=\"M 70 60 L 70 85\"/><polygon points=\"58,60 70,55 70,65\" fill=\"#000000\"/></g></svg>"
@@ -542,12 +674,24 @@
 		],
 		"labels": {
 			"designator": [
-				{ "x": 30, "y": -12 },
-				{ "x": -12, "y": 40 }
+				{
+					"x": 30,
+					"y": -12
+				},
+				{
+					"x": -12,
+					"y": 40
+				}
 			],
 			"value": [
-				{ "x": 30, "y": 92 },
-				{ "x": 72, "y": 40 }
+				{
+					"x": 30,
+					"y": 92
+				},
+				{
+					"x": 72,
+					"y": 40
+				}
 			]
 		},
 		"svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 90 120\"><g fill=\"none\" stroke=\"#000000\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M 0 60 L 15 60\"/><circle cx=\"20\" cy=\"60\" r=\"5\" fill=\"none\"/><path d=\"M 25 30 L 25 90\"/><path d=\"M 35 25 L 35 45\"/><path d=\"M 35 50 L 35 70\"/><path d=\"M 35 75 L 35 95\"/><path d=\"M 35 35 L 70 35\"/><path d=\"M 70 35 L 70 0\"/><path d=\"M 35 85 L 70 85\"/><path d=\"M 70 85 L 70 120\"/><path d=\"M 35 60 L 70 60\"/><path d=\"M 70 60 L 70 35\"/><polygon points=\"58,60 70,55 70,65\" fill=\"#000000\"/></g></svg>"

@@ -20,27 +20,49 @@
         }
         
         h1 {
-            margin: 0 0 20px 0;
-            font-size: 20px;
-            color: #222;
-            font-weight: normal;
-            letter-spacing: 2px;
+            margin: 0 0 24px 0;
+            font-size: 22px;
+            color: #111;
+            font-weight: 900;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
         }
         
         .container {
             display: grid;
-            grid-template-columns: 220px 1fr 320px;
+            grid-template-columns: minmax(0, 1fr) 320px;
             gap: 20px;
             max-width: 1600px;
             margin: 0 auto;
+            align-items: stretch;
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 240px minmax(500px, 1fr);
+            gap: 20px;
+            align-content: start;
+        }
+
+        .components-panel {
+            grid-column: 1;
+            grid-row: 1;
+            min-height: 650px;
+            max-height: 650px;
+        }
+
+        .canvas-panel {
+            grid-column: 2;
+            grid-row: 1;
         }
         
         .panel {
             background: #fff;
             border-radius: 0;
-            padding: 15px;
-            border: 1px solid #ccc;
+            padding: 16px;
+            border: 1px solid #d0d0d0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         }
         
         .panel h2 {
@@ -123,23 +145,27 @@
         }
         
         .btn-primary {
-            background: #333;
+            background: #222;
             color: #fff;
-            border: 1px solid #333;
+            border: 1px solid #222;
+            font-weight: 500;
         }
         
         .btn-primary:hover {
-            background: #555;
+            background: #444;
+            border-color: #444;
         }
         
         .btn-secondary {
             background: #fff;
             color: #333;
-            border: 1px solid #999;
+            border: 1px solid #aaa;
+            font-weight: 500;
         }
         
         .btn-secondary:hover {
-            background: #f5f5f5;
+            background: #f8f8f8;
+            border-color: #888;
         }
         
         .btn-danger {
@@ -162,6 +188,9 @@
         .canvas-container {
             display: flex;
             flex-direction: column;
+            gap: 16px;
+            min-height: 650px;
+            max-height: 650px;
         }
         
         .toolbar {
@@ -195,15 +224,27 @@
             color: #222;
         }
         
+        .canvas-layout {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .canvas-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
         .canvas-wrapper {
             flex: 1;
             background: #fff;
             border-radius: 0;
             overflow: hidden;
             position: relative;
-            min-height: 400px;
+            min-height: 500px;
             max-height: 500px;
-            border: 1px solid #ccc;
+            border: 1px solid #d0d0d0;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
         }
         
         #canvas {
@@ -222,14 +263,56 @@
             pointer-events: none;
             font-family: monospace;
         }
+
+        .label-preview-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 220px;
+            flex-shrink: 0;
+        }
+        
+        .label-preview {
+            border: 1px solid #d0d0d0;
+            background: #fafafa;
+            padding: 8px;
+        }
+        
+        .label-preview-title {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .label-preview canvas {
+            width: 100%;
+            height: 140px;
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            display: block;
+        }
+        
+        .label-chip {
+            font-size: 9px;
+            color: #999;
+            border: 1px solid #ccc;
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
         
         /* Properties Panel */
         .properties {
             display: flex;
             flex-direction: column;
             gap: 15px;
-            max-height: calc(100vh - 100px);
             overflow-y: auto;
+            align-self: stretch;
+            height: 100%;
         }
         
         .prop-group {
@@ -269,11 +352,23 @@
         .prop-row input[type="number"] {
             flex: 1;
             padding: 6px 10px;
-            border: 1px solid #999;
+            border: 1px solid #aaa;
             border-radius: 0;
             background: #fff;
             color: #222;
             font-size: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .prop-row input[type="text"]::placeholder,
+        .prop-row input[type="number"]::placeholder {
+            color: #c3c3c3;
+        }
+        
+        .prop-row input[type="text"]:focus,
+        .prop-row input[type="number"]:focus {
+            outline: none;
+            border-color: #333;
         }
         
         .prop-row input[type="checkbox"] {
@@ -321,6 +416,16 @@
             color: #222;
             font-size: 11px;
         }
+
+        .label-coords {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .label-coords input {
+            width: 60px;
+        }
         
         .small-btn {
             padding: 4px 8px;
@@ -329,7 +434,8 @@
         
         /* JSON Output */
         .json-output {
-            margin-top: 20px;
+            grid-column: 1 / span 2;
+            margin-top: 0;
         }
         
         .json-output h2 {
@@ -340,7 +446,7 @@
         
         #jsonOutput {
             width: 100%;
-            height: 300px;
+            height: 420px;
             background: #fafafa;
             border: 1px solid #999;
             border-radius: 0;
@@ -366,6 +472,7 @@
         .mode-circle { background: #333; color: #fff; }
         .mode-arc { background: #333; color: #fff; }
         .mode-polygon { background: #333; color: #fff; }
+        .mode-polyline { background: #333; color: #fff; }
         .mode-pin { background: #333; color: #fff; }
         
         /* File import */
@@ -375,35 +482,36 @@
     </style>
 </head>
 <body>
-    <h1>⚡ Circuit Symbol Editor</h1>
+    <h1>Circuit Symbol Editor</h1>
     
     <div class="container">
-        <!-- Left Panel: Component List -->
-        <div class="panel">
-            <h2>Components</h2>
-            <div class="component-list" id="componentList"></div>
-            <div class="btn-group">
-                <button class="btn btn-primary btn-icon" onclick="newComponent()" title="New Component">
-                    <span class="material-symbols-outlined">add</span>
-                </button>
-                <button class="btn btn-secondary btn-icon" onclick="duplicateComponent()" title="Duplicate Component">
-                    <span class="material-symbols-outlined">content_copy</span>
-                </button>
-                <button class="btn btn-danger btn-icon" onclick="deleteComponent()" title="Delete Component">
-                    <span class="material-symbols-outlined">delete</span>
-                </button>
+        <div class="workspace-grid">
+            <!-- Left Panel: Component List -->
+            <div class="panel components-panel">
+                <h2>Components</h2>
+                <div class="component-list" id="componentList"></div>
+                <div class="btn-group">
+                    <button class="btn btn-primary btn-icon" onclick="newComponent()" title="New Component">
+                        <span class="material-symbols-outlined">add</span>
+                    </button>
+                    <button class="btn btn-secondary btn-icon" onclick="duplicateComponent()" title="Duplicate Component">
+                        <span class="material-symbols-outlined">content_copy</span>
+                    </button>
+                    <button class="btn btn-danger btn-icon" onclick="deleteComponent()" title="Delete Component">
+                        <span class="material-symbols-outlined">delete</span>
+                    </button>
+                </div>
+                <div class="btn-group">
+                    <input type="file" id="fileInput" accept=".json" onchange="loadFromFile(event)">
+                    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load JSON</button>
+                </div>
             </div>
-            <div class="btn-group">
-                <input type="file" id="fileInput" accept=".json" onchange="loadFromFile(event)">
-                <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">Load JSON</button>
-            </div>
-        </div>
-        
-        <!-- Center: Canvas -->
-        <div class="panel canvas-container">
+            
+            <!-- Center: Canvas -->
+            <div class="panel canvas-container canvas-panel">
             <div class="toolbar">
                 <button class="btn btn-secondary btn-icon" onclick="setMode('select')" id="btn-select" title="Select">
-                    <span class="material-symbols-outlined">near_me</span>
+                    <span class="material-symbols-outlined">arrow_selector_tool</span>
                 </button>
                 <button class="btn btn-secondary btn-icon" onclick="setMode('line')" id="btn-line" title="Line">
                     <span class="material-symbols-outlined">diagonal_line</span>
@@ -416,6 +524,9 @@
                 </button>
                 <button class="btn btn-secondary btn-icon" onclick="setMode('polygon')" id="btn-polygon" title="Polygon">
                     <span class="material-symbols-outlined">pentagon</span>
+                </button>
+                <button class="btn btn-secondary btn-icon" onclick="setMode('polyline')" id="btn-polyline" title="Polyline">
+                    <span class="material-symbols-outlined">polyline</span>
                 </button>
                 <button class="btn btn-secondary btn-icon" onclick="setMode('pin')" id="btn-pin" title="Pin">
                     <span class="material-symbols-outlined">line_end_circle</span>
@@ -433,20 +544,50 @@
                 <label>Zoom:</label>
                 <input type="number" id="zoomLevel" value="3" min="1" max="10" step="0.5" onchange="redraw()">
             </div>
-            <div class="canvas-wrapper">
-                <canvas id="canvas"></canvas>
-                <div class="canvas-info" id="canvasInfo">x: 0, y: 0</div>
-            </div>
-            <div class="toolbar" style="margin-top: 10px;">
-                <button class="btn btn-secondary btn-icon" onclick="deleteSelected()" title="Delete Selected">
-                    <span class="material-symbols-outlined">backspace</span>
-                </button>
-                <button class="btn btn-secondary btn-icon" onclick="clearDrawing()" title="Clear All">
-                    <span class="material-symbols-outlined">delete_sweep</span>
-                </button>
+            <div class="canvas-layout">
+                <div class="label-preview-section">
+                    <div class="label-preview">
+                        <div class="label-preview-title">
+                            <span>Labels 0° / 180°</span>
+                            <span class="label-chip">View Only</span>
+                        </div>
+                        <canvas id="labelPreview0"></canvas>
+                    </div>
+                    <div class="label-preview">
+                        <div class="label-preview-title">
+                            <span>Labels 90° / 270°</span>
+                            <span class="label-chip">View Only</span>
+                        </div>
+                        <canvas id="labelPreview90"></canvas>
+                    </div>
+                </div>
+                <div class="canvas-main">
+                    <div class="canvas-wrapper">
+                        <canvas id="canvas"></canvas>
+                        <div class="canvas-info" id="canvasInfo">x: 0, y: 0</div>
+                    </div>
+                    <div class="toolbar">
+                        <button class="btn btn-secondary btn-icon" onclick="deleteSelected()" title="Delete Selected">
+                            <span class="material-symbols-outlined">backspace</span>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" onclick="clearDrawing()" title="Clear All">
+                            <span class="material-symbols-outlined">delete_sweep</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-        
+
+            <!-- JSON Output -->
+            <div class="panel json-output">
+                <h2>
+                    JSON Output
+                    <button class="btn btn-secondary" onclick="copyJSON()">Copy to Clipboard</button>
+                </h2>
+                <textarea id="jsonOutput" readonly></textarea>
+            </div>
+        </div>
+
         <!-- Right Panel: Properties -->
         <div class="panel properties">
             <div class="prop-group">
@@ -496,6 +637,42 @@
                 <div class="pin-list" id="pinList"></div>
                 <button class="btn btn-secondary small-btn" style="margin-top: 8px;" onclick="addPinManual()">+ Add Pin</button>
             </div>
+
+            <div class="prop-group">
+                <h3>Label Placement (0° / 180°)</h3>
+                <div class="prop-row">
+                    <label>Designator:</label>
+                    <div class="label-coords">
+                        <input type="number" id="designatorLabel0X" placeholder="x">
+                        <input type="number" id="designatorLabel0Y" placeholder="y">
+                    </div>
+                </div>
+                <div class="prop-row">
+                    <label>Value:</label>
+                    <div class="label-coords">
+                        <input type="number" id="valueLabel0X" placeholder="x">
+                        <input type="number" id="valueLabel0Y" placeholder="y">
+                    </div>
+                </div>
+            </div>
+
+            <div class="prop-group">
+                <h3>Label Placement (90° / 270°)</h3>
+                <div class="prop-row">
+                    <label>Designator:</label>
+                    <div class="label-coords">
+                        <input type="number" id="designatorLabel90X" placeholder="x">
+                        <input type="number" id="designatorLabel90Y" placeholder="y">
+                    </div>
+                </div>
+                <div class="prop-row">
+                    <label>Value:</label>
+                    <div class="label-coords">
+                        <input type="number" id="valueLabel90X" placeholder="x">
+                        <input type="number" id="valueLabel90Y" placeholder="y">
+                    </div>
+                </div>
+            </div>
             
             <div class="prop-group">
                 <h3>Drawing Elements</h3>
@@ -506,14 +683,7 @@
         </div>
     </div>
     
-    <!-- JSON Output -->
-    <div class="panel json-output" style="margin-top: 20px; max-width: 1600px; margin-left: auto; margin-right: auto;">
-        <h2>
-            JSON Output
-            <button class="btn btn-secondary" onclick="copyJSON()">Copy to Clipboard</button>
-        </h2>
-        <textarea id="jsonOutput" readonly></textarea>
-    </div>
+    
 
     <script>
         // State
@@ -531,6 +701,12 @@
         let drawStart = null;
         let selectionRect = null; // { x1, y1, x2, y2 } in component coords
         let polygonPoints = [];
+        let polylinePoints = [];
+        let arcStage = 0; // 0: idle, 1: center chosen, 2: start/radius chosen
+        let arcCenter = null;
+        let arcRadius = null;
+        let arcStartAngle = null;
+        let arcPreviewPoint = null;
         let editingVertex = null; // { elementIndex, vertexIndex or 'start'/'end' }
         let undoStack = []; // Stack of actions for undo
         let originalElementState = null; // Element state at start of drag
@@ -538,11 +714,22 @@
         
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        const labelPreviewCanvases = [
+            { canvas: document.getElementById('labelPreview0'), orientation: 0 },
+            { canvas: document.getElementById('labelPreview90'), orientation: 90 }
+        ].map(entry => ({
+            ...entry,
+            ctx: entry.canvas ? entry.canvas.getContext('2d') : null
+        }));
+        let labelPreviewDirty = false;
         
         // Initialize
         function init() {
             resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
+            resizePreviewCanvases();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+            });
             canvas.addEventListener('mousedown', onMouseDown);
             canvas.addEventListener('mousemove', onMouseMove);
             canvas.addEventListener('mouseup', onMouseUp);
@@ -553,11 +740,19 @@
                 if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
                     e.preventDefault();
                     undo();
+                } else if (e.key === 'Escape') {
+                    if (mode === 'arc' && arcStage > 0) {
+                        resetArcConstruction();
+                        redraw();
+                    }
                 }
             });
             
             // Load default components
+            attachLabelInputListeners();
+            window.addEventListener('mouseup', () => flushLabelPreviewUpdates());
             loadDefaultComponents();
+            requestLabelPreviewUpdate({ immediate: true });
         }
         
         function loadDefaultComponents() {
@@ -613,6 +808,9 @@
             
             updateComponentList();
             updateJSON();
+            const defaultWidth = parseInt(document.getElementById('compWidth').value, 10) || 80;
+            const defaultHeight = parseInt(document.getElementById('compHeight').value, 10) || 40;
+            setLabelInputs(getDefaultLabelPositions(defaultWidth, defaultHeight), defaultWidth, defaultHeight);
         }
         
         function resizeCanvas() {
@@ -627,6 +825,8 @@
         function setMode(newMode) {
             mode = newMode;
             polygonPoints = [];
+            polylinePoints = [];
+            resetArcConstruction();
             
             // Update button states
             document.querySelectorAll('.toolbar .btn').forEach(btn => {
@@ -646,6 +846,14 @@
             
             redraw();
         }
+
+        function resetArcConstruction() {
+            arcStage = 0;
+            arcCenter = null;
+            arcRadius = null;
+            arcStartAngle = null;
+            arcPreviewPoint = null;
+        }
         
         // Canvas coordinate helpers
         function getCanvasOffset() {
@@ -660,16 +868,16 @@
             return { x: offsetX, y: offsetY, zoom };
         }
         
-        function canvasToComponent(cx, cy) {
+        function canvasToComponent(cx, cy, options = {}) {
             const { x: offsetX, y: offsetY, zoom } = getCanvasOffset();
             const grid = parseInt(document.getElementById('gridSize').value);
-            const snapEnabled = document.getElementById('snapToGrid').checked;
+            const snapSetting = options.snap !== undefined ? options.snap : document.getElementById('snapToGrid').checked;
             
             let compX = (cx - offsetX) / zoom;
             let compY = (cy - offsetY) / zoom;
             
             // Snap to grid if enabled
-            if (snapEnabled) {
+            if (snapSetting) {
                 compX = Math.round(compX / grid) * grid;
                 compY = Math.round(compY / grid) * grid;
             }
@@ -682,6 +890,295 @@
             return {
                 x: compX * zoom + offsetX,
                 y: compY * zoom + offsetY
+            };
+        }
+
+        function requestLabelPreviewUpdate(options = {}) {
+            const immediate = options.immediate || false;
+            if (immediate) {
+                labelPreviewDirty = false;
+                updateLabelPreviews();
+                return;
+            }
+            const shouldDefer = isDrawing || isDragging || isSelecting || (mode === 'arc' && arcStage > 0);
+            if (shouldDefer) {
+                labelPreviewDirty = true;
+                return;
+            }
+            labelPreviewDirty = false;
+            updateLabelPreviews();
+        }
+
+        function flushLabelPreviewUpdates() {
+            if (!labelPreviewDirty) return;
+            labelPreviewDirty = false;
+            updateLabelPreviews();
+        }
+
+        function attachLabelInputListeners() {
+            const ids = [
+                'designatorLabel0X', 'designatorLabel0Y',
+                'valueLabel0X', 'valueLabel0Y',
+                'designatorLabel90X', 'designatorLabel90Y',
+                'valueLabel90X', 'valueLabel90Y'
+            ];
+            ids.forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    const trigger = () => requestLabelPreviewUpdate({ immediate: true });
+                    input.addEventListener('input', trigger);
+                    input.addEventListener('change', trigger);
+                }
+            });
+            ['compPrefix', 'compDefault'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    const trigger = () => requestLabelPreviewUpdate({ immediate: true });
+                    input.addEventListener('input', trigger);
+                    input.addEventListener('change', trigger);
+                }
+            });
+        }
+
+        function resizePreviewCanvases() {
+            labelPreviewCanvases.forEach(({ canvas }) => {
+                if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) return;
+                if (canvas.width !== rect.width || canvas.height !== rect.height) {
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                }
+            });
+        }
+
+        function updateLabelPreviews() {
+            resizePreviewCanvases();
+            const compWidth = parseInt(document.getElementById('compWidth').value, 10) || 80;
+            const compHeight = parseInt(document.getElementById('compHeight').value, 10) || 40;
+            const labels = readLabelInputs(compWidth, compHeight);
+            labelPreviewCanvases.forEach(preview => {
+                drawLabelPreview(preview, labels, compWidth, compHeight);
+            });
+        }
+
+        function drawLabelPreview(preview, labels, compWidth, compHeight) {
+            const { canvas, ctx, orientation } = preview;
+            if (!canvas || !ctx || canvas.width === 0 || canvas.height === 0) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const angle = orientation === 90 ? Math.PI / 2 : 0;
+            const designator = orientation === 0 ? labels.designator[0] : labels.designator[1];
+            const value = orientation === 0 ? labels.value[0] : labels.value[1];
+            const extraPoints = [designator, value]
+                .filter(Boolean)
+                .map(point => ({ point, rotate: false }));
+            const transform = createPreviewTransform(
+                compWidth,
+                compHeight,
+                angle,
+                canvas.width,
+                canvas.height,
+                extraPoints
+            );
+            if (!transform) return;
+
+            // Draw component boundary
+            ctx.save();
+            ctx.strokeStyle = '#c2c2c2';
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(
+                transform.offsetX,
+                transform.offsetY,
+                transform.bounds.width * transform.scale,
+                transform.bounds.height * transform.scale
+            );
+            ctx.restore();
+
+            drawPreviewOrigin(ctx, transform);
+            drawPreviewElements(ctx, transform);
+            drawPreviewPins(ctx, transform);
+
+            const prefixInput = document.getElementById('compPrefix');
+            const defaultInput = document.getElementById('compDefault');
+            const prefixText = (prefixInput?.value || '').trim() || 'DES';
+            const defaultText = (defaultInput?.value || '').trim() || 'VAL';
+            drawLabelMarker(ctx, designator, transform, '#1e88e5', prefixText);
+            drawLabelMarker(ctx, value, transform, '#43a047', defaultText);
+        }
+
+        function drawPreviewOrigin(ctx, transform) {
+            const origin = projectPointForPreview({ x: 0, y: 0 }, transform);
+            ctx.save();
+            ctx.fillStyle = '#666';
+            ctx.beginPath();
+            ctx.arc(origin.x, origin.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPreviewElements(ctx, transform) {
+            ctx.save();
+            ctx.strokeStyle = '#444';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            elements.forEach(el => {
+                const strokeWidth = Math.max(1, ((el.strokeWidth || 4) * transform.scale) / 3);
+                ctx.lineWidth = strokeWidth;
+                if (el.type === 'line') {
+                    const start = projectPointForPreview({ x: el.x1, y: el.y1 }, transform);
+                    const end = projectPointForPreview({ x: el.x2, y: el.y2 }, transform);
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+                } else if (el.type === 'circle') {
+                    const center = projectPointForPreview({ x: el.cx, y: el.cy }, transform);
+                    const radius = Math.max(1, el.r * transform.scale);
+                    ctx.beginPath();
+                    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+                    if (el.filled) {
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                        ctx.fill();
+                    }
+                    ctx.stroke();
+                } else if (el.type === 'arc') {
+                    const center = projectPointForPreview({ x: el.cx, y: el.cy }, transform);
+                    const radius = Math.max(1, el.r * transform.scale);
+                    ctx.beginPath();
+                    ctx.arc(
+                        center.x,
+                        center.y,
+                        radius,
+                        el.startAngle + transform.angle,
+                        el.endAngle + transform.angle
+                    );
+                    ctx.stroke();
+                } else if (el.type === 'polygon' && el.points) {
+                    const pts = el.points.map(pt => projectPointForPreview(pt, transform));
+                    if (pts.length) {
+                        ctx.beginPath();
+                        ctx.moveTo(pts[0].x, pts[0].y);
+                        pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+                        ctx.closePath();
+                        if (el.filled) {
+                            ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+                            ctx.fill();
+                        }
+                        ctx.stroke();
+                    }
+                } else if (el.type === 'polyline' && el.points) {
+                    const pts = el.points.map(pt => projectPointForPreview(pt, transform));
+                    if (pts.length) {
+                        ctx.beginPath();
+                        ctx.moveTo(pts[0].x, pts[0].y);
+                        pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+                        ctx.stroke();
+                    }
+                }
+            });
+            ctx.restore();
+        }
+
+        function drawPreviewPins(ctx, transform) {
+            ctx.save();
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            pins.forEach(pin => {
+                const pos = projectPointForPreview(pin.position, transform);
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.fillText(pin.id, pos.x, pos.y);
+            });
+            ctx.restore();
+        }
+
+        function drawLabelMarker(ctx, point, transform, color, label) {
+            if (!point) return;
+            const projected = projectPointForPreview(point, transform, false);
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(projected.x, projected.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, projected.x + 6, projected.y);
+            ctx.restore();
+        }
+
+        function createPreviewTransform(width, height, angle, canvasWidth, canvasHeight, extraPoints = []) {
+            if (!width || !height || !canvasWidth || !canvasHeight) return null;
+            const bounds = getRotatedBounds(width, height, angle, extraPoints);
+            const padding = 12;
+            const usableWidth = Math.max(canvasWidth - padding * 2, 10);
+            const usableHeight = Math.max(canvasHeight - padding * 2, 10);
+            const scale = Math.min(
+                usableWidth / (bounds.width || 1),
+                usableHeight / (bounds.height || 1)
+            );
+            const offsetX = (canvasWidth - bounds.width * scale) / 2;
+            const offsetY = (canvasHeight - bounds.height * scale) / 2;
+            return { angle, width, height, bounds, scale, offsetX, offsetY };
+        }
+
+        function getRotatedBounds(width, height, angle, extraPoints = []) {
+            const baseCorners = [
+                { x: 0, y: 0 },
+                { x: width, y: 0 },
+                { x: width, y: height },
+                { x: 0, y: height }
+            ].map(pt => angle === 0 ? pt : rotatePointAroundCenter(pt, angle, width, height));
+            const xs = baseCorners.map(p => p.x);
+            const ys = baseCorners.map(p => p.y);
+            extraPoints.forEach(entry => {
+                if (!entry || !entry.point) return;
+                const shouldRotate = entry.rotate !== false;
+                const candidate = shouldRotate
+                    ? rotatePointAroundCenter(entry.point, angle, width, height)
+                    : { x: entry.point.x, y: entry.point.y };
+                xs.push(candidate.x);
+                ys.push(candidate.y);
+            });
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+            return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+        }
+
+        function rotatePointAroundCenter(point, angle, width, height) {
+            if (angle === 0) return { x: point.x, y: point.y };
+            const cx = width / 2;
+            const cy = height / 2;
+            const dx = point.x - cx;
+            const dy = point.y - cy;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            return {
+                x: cx + dx * cosA - dy * sinA,
+                y: cy + dx * sinA + dy * cosA
+            };
+        }
+
+        function projectPointForPreview(point, transform, rotatePoint = true) {
+            if (!point) return { x: 0, y: 0 };
+            const source = rotatePoint ?
+                rotatePointAroundCenter(point, transform.angle, transform.width, transform.height) :
+                { x: point.x, y: point.y };
+            const normalizedX = source.x - transform.bounds.minX;
+            const normalizedY = source.y - transform.bounds.minY;
+            return {
+                x: transform.offsetX + normalizedX * transform.scale,
+                y: transform.offsetY + normalizedY * transform.scale
             };
         }
         
@@ -765,6 +1262,22 @@
                 ctx.stroke();
             }
             
+            // Draw polyline in progress
+            if (mode === 'polyline' && polylinePoints.length > 0) {
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const first = componentToCanvas(polylinePoints[0].x, polylinePoints[0].y);
+                ctx.moveTo(first.x, first.y);
+                polylinePoints.forEach(pt => {
+                    const p = componentToCanvas(pt.x, pt.y);
+                    ctx.lineTo(p.x, p.y);
+                });
+                ctx.stroke();
+            }
+            
+            drawArcConstructionPreview();
+
             // Draw selection rectangle
             if (isSelecting && selectionRect) {
                 const start = componentToCanvas(selectionRect.x1, selectionRect.y1);
@@ -778,6 +1291,8 @@
                 ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
                 ctx.setLineDash([]);
             }
+
+            requestLabelPreviewUpdate();
         }
         
         function drawElement(el, isSelected, zoom, offsetX, offsetY) {
@@ -818,7 +1333,61 @@
                     if (el.filled) ctx.fill();
                     ctx.stroke();
                 }
+            } else if (el.type === 'polyline') {
+                if (el.points && el.points.length > 0) {
+                    ctx.beginPath();
+                    const first = componentToCanvas(el.points[0].x, el.points[0].y);
+                    ctx.moveTo(first.x, first.y);
+                    el.points.forEach(pt => {
+                        const p = componentToCanvas(pt.x, pt.y);
+                        ctx.lineTo(p.x, p.y);
+                    });
+                    // Don't close path for polyline
+                    ctx.stroke();
+                }
             }
+        }
+
+        function drawArcConstructionPreview() {
+            if (mode !== 'arc' || arcStage === 0 || !arcCenter) return;
+            const { zoom } = getCanvasOffset();
+            const centerCanvas = componentToCanvas(arcCenter.x, arcCenter.y);
+            ctx.save();
+            ctx.strokeStyle = '#0066ff';
+            ctx.fillStyle = '#0066ff';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(centerCanvas.x, centerCanvas.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+            if (arcStage === 1 && arcPreviewPoint) {
+                const previewCanvas = componentToCanvas(arcPreviewPoint.x, arcPreviewPoint.y);
+                ctx.beginPath();
+                ctx.moveTo(centerCanvas.x, centerCanvas.y);
+                ctx.lineTo(previewCanvas.x, previewCanvas.y);
+                ctx.stroke();
+                const radius = Math.sqrt(Math.pow(arcPreviewPoint.x - arcCenter.x, 2) + Math.pow(arcPreviewPoint.y - arcCenter.y, 2));
+                if (radius > 0) {
+                    ctx.beginPath();
+                    ctx.arc(centerCanvas.x, centerCanvas.y, radius * zoom, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else if (arcStage === 2 && arcRadius) {
+                const startPoint = {
+                    x: arcCenter.x + Math.cos(arcStartAngle) * arcRadius,
+                    y: arcCenter.y + Math.sin(arcStartAngle) * arcRadius
+                };
+                const startCanvas = componentToCanvas(startPoint.x, startPoint.y);
+                ctx.beginPath();
+                ctx.moveTo(centerCanvas.x, centerCanvas.y);
+                ctx.lineTo(startCanvas.x, startCanvas.y);
+                ctx.stroke();
+                const endAngle = arcPreviewPoint ? Math.atan2(arcPreviewPoint.y - arcCenter.y, arcPreviewPoint.x - arcCenter.x) : arcStartAngle;
+                ctx.beginPath();
+                ctx.arc(centerCanvas.x, centerCanvas.y, arcRadius * zoom, arcStartAngle, endAngle);
+                ctx.stroke();
+            }
+            ctx.restore();
         }
         
         // Mouse handlers
@@ -828,7 +1397,8 @@
             const scaleY = canvas.height / rect.height;
             const cx = (e.clientX - rect.left) * scaleX;
             const cy = (e.clientY - rect.top) * scaleY;
-            const pos = canvasToComponent(cx, cy);
+            const shouldSnap = mode !== 'select';
+            const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
             
             if (mode === 'select') {
                 const shiftKey = e.shiftKey;
@@ -904,11 +1474,16 @@
             } else if (mode === 'line') {
                 isDrawing = true;
                 drawStart = pos;
-            } else if (mode === 'circle' || mode === 'arc') {
+            } else if (mode === 'circle') {
                 isDrawing = true;
                 drawStart = pos;
+            } else if (mode === 'arc') {
+                handleArcClick(pos);
             } else if (mode === 'polygon') {
                 polygonPoints.push(pos);
+                redraw();
+            } else if (mode === 'polyline') {
+                polylinePoints.push(pos);
                 redraw();
             } else if (mode === 'pin') {
                 addPin(pos);
@@ -921,9 +1496,16 @@
             const scaleY = canvas.height / rect.height;
             const cx = (e.clientX - rect.left) * scaleX;
             const cy = (e.clientY - rect.top) * scaleY;
-            const pos = canvasToComponent(cx, cy);
+            const shouldSnap = mode !== 'select';
+            const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
             
             document.getElementById('canvasInfo').textContent = `x: ${pos.x}, y: ${pos.y}`;
+
+            if (mode === 'arc' && arcStage > 0) {
+                arcPreviewPoint = pos;
+                redraw();
+                return;
+            }
             
             if (isSelecting && selectionRect) {
                 // Update selection rectangle
@@ -934,6 +1516,9 @@
                 if (editingVertex) {
                     // Edit only the selected vertex
                     const el = elements[editingVertex.elementIndex];
+                    const snapToGrid = document.getElementById('snapToGrid').checked;
+                    const gridSize = parseInt(document.getElementById('gridSize').value) || 1;
+                    const snapValue = (value) => Math.round(value / gridSize) * gridSize;
                     if (el.type === 'line') {
                         if (editingVertex.vertex === 'start') {
                             el.x1 = pos.x;
@@ -942,7 +1527,23 @@
                             el.x2 = pos.x;
                             el.y2 = pos.y;
                         }
-                    } else if (el.type === 'polygon' && el.points) {
+                    } else if (el.type === 'circle') {
+                        if (editingVertex.vertex === 'center') {
+                            const snappedX = snapToGrid ? snapValue(pos.x) : pos.x;
+                            const snappedY = snapToGrid ? snapValue(pos.y) : pos.y;
+                            el.cx = snappedX;
+                            el.cy = snappedY;
+                        } else if (editingVertex.vertex === 'radius') {
+                            let handleX = pos.x;
+                            let handleY = pos.y;
+                            if (snapToGrid) {
+                                handleX = snapValue(handleX);
+                                handleY = snapValue(handleY);
+                            }
+                            const radius = Math.sqrt(Math.pow(handleX - el.cx, 2) + Math.pow(handleY - el.cy, 2));
+                            el.r = Math.max(1, Math.round(radius));
+                        }
+                    } else if ((el.type === 'polygon' || el.type === 'polyline') && el.points) {
                         el.points[editingVertex.vertex].x = pos.x;
                         el.points[editingVertex.vertex].y = pos.y;
                     }
@@ -975,7 +1576,7 @@
                         } else if (el.type === 'circle' || el.type === 'arc') {
                             el.cx = orig.cx + offsetX;
                             el.cy = orig.cy + offsetY;
-                        } else if (el.type === 'polygon' && el.points) {
+                        } else if ((el.type === 'polygon' || el.type === 'polyline') && el.points) {
                             el.points.forEach((p, i) => {
                                 p.x = orig.points[i].x + offsetX;
                                 p.y = orig.points[i].y + offsetY;
@@ -1002,7 +1603,7 @@
                     } else if (el.type === 'circle' || el.type === 'arc') {
                         targetX = orig.cx + offsetX;
                         targetY = orig.cy + offsetY;
-                    } else if (el.type === 'polygon' && el.points) {
+                    } else if ((el.type === 'polygon' || el.type === 'polyline') && el.points) {
                         targetX = orig.points[0].x + offsetX;
                         targetY = orig.points[0].y + offsetY;
                     }
@@ -1022,7 +1623,7 @@
                     } else if (el.type === 'circle' || el.type === 'arc') {
                         dx = targetX - orig.cx;
                         dy = targetY - orig.cy;
-                    } else if (el.type === 'polygon' && el.points) {
+                    } else if ((el.type === 'polygon' || el.type === 'polyline') && el.points) {
                         dx = targetX - orig.points[0].x;
                         dy = targetY - orig.points[0].y;
                     }
@@ -1036,7 +1637,7 @@
                     } else if (el.type === 'circle' || el.type === 'arc') {
                         el.cx = orig.cx + dx;
                         el.cy = orig.cy + dy;
-                    } else if (el.type === 'polygon' && el.points) {
+                    } else if ((el.type === 'polygon' || el.type === 'polyline') && el.points) {
                         el.points.forEach((p, i) => {
                             p.x = orig.points[i].x + dx;
                             p.y = orig.points[i].y + dy;
@@ -1061,7 +1662,7 @@
                     ctx.moveTo(start.x, start.y);
                     ctx.lineTo(end.x, end.y);
                     ctx.stroke();
-                } else if (mode === 'circle' || mode === 'arc') {
+                } else if (mode === 'circle') {
                     const radius = Math.sqrt(Math.pow(pos.x - drawStart.x, 2) + Math.pow(pos.y - drawStart.y, 2));
                     ctx.beginPath();
                     ctx.arc(start.x, start.y, radius * zoom, 0, Math.PI * 2);
@@ -1135,7 +1736,8 @@
             const scaleY = canvas.height / rect.height;
             const cx = (e.clientX - rect.left) * scaleX;
             const cy = (e.clientY - rect.top) * scaleY;
-            const pos = canvasToComponent(cx, cy);
+            const shouldSnap = mode !== 'select';
+            const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
             
             const strokeWidth = parseInt(document.getElementById('strokeWidth').value);
             const filled = document.getElementById('filled').checked;
@@ -1161,24 +1763,46 @@
                     filled
                 });
                 undoStack.push({ type: 'create', index: elements.length - 1 });
-            } else if (mode === 'arc') {
-                const radius = Math.sqrt(Math.pow(pos.x - drawStart.x, 2) + Math.pow(pos.y - drawStart.y, 2));
-                const angle = Math.atan2(pos.y - drawStart.y, pos.x - drawStart.x);
-                elements.push({
-                    type: 'arc',
-                    cx: drawStart.x,
-                    cy: drawStart.y,
-                    r: Math.round(radius),
-                    startAngle: 0,
-                    endAngle: angle,
-                    strokeWidth
-                });
-                undoStack.push({ type: 'create', index: elements.length - 1 });
             }
             
             isDrawing = false;
             drawStart = null;
             updateElementList();
+            redraw();
+        }
+
+        function handleArcClick(pos) {
+            if (arcStage === 0) {
+                arcCenter = pos;
+                arcStage = 1;
+            } else if (arcStage === 1) {
+                const radius = Math.sqrt(Math.pow(pos.x - arcCenter.x, 2) + Math.pow(pos.y - arcCenter.y, 2));
+                if (radius < 1) return;
+                arcRadius = radius;
+                arcStartAngle = Math.atan2(pos.y - arcCenter.y, pos.x - arcCenter.x);
+                arcStage = 2;
+                arcPreviewPoint = pos;
+            } else if (arcStage === 2) {
+                const strokeWidth = parseInt(document.getElementById('strokeWidth').value);
+                const endAngle = Math.atan2(pos.y - arcCenter.y, pos.x - arcCenter.x);
+                if (Math.abs(endAngle - arcStartAngle) < 0.01) {
+                    arcPreviewPoint = pos;
+                    redraw();
+                    return;
+                }
+                elements.push({
+                    type: 'arc',
+                    cx: arcCenter.x,
+                    cy: arcCenter.y,
+                    r: Math.max(1, Math.round(arcRadius)),
+                    startAngle: arcStartAngle,
+                    endAngle,
+                    strokeWidth
+                });
+                undoStack.push({ type: 'create', index: elements.length - 1 });
+                resetArcConstruction();
+                updateElementList();
+            }
             redraw();
         }
         
@@ -1198,11 +1822,33 @@
                 polygonPoints = [];
                 updateElementList();
                 redraw();
+            } else if (mode === 'polyline' && polylinePoints.length >= 2) {
+                const strokeWidth = parseInt(document.getElementById('strokeWidth').value);
+                
+                elements.push({
+                    type: 'polyline',
+                    points: [...polylinePoints],
+                    strokeWidth
+                });
+                undoStack.push({ type: 'create', index: elements.length - 1 });
+                
+                polylinePoints = [];
+                updateElementList();
+                redraw();
             }
+        }
+
+        function getHitThreshold(targetPixels = 4, options = {}) {
+            const { zoom } = getCanvasOffset();
+            const safeZoom = Math.max(zoom, 0.1);
+            const minComponentUnits = options.min || 1.5;
+            const maxComponentUnits = options.max || 8;
+            const converted = targetPixels / safeZoom;
+            return Math.max(minComponentUnits, Math.min(maxComponentUnits, converted));
         }
         
         function findElementAt(x, y) {
-            const threshold = 3; // Balanced threshold for element selection
+            const threshold = getHitThreshold(3, { min: 1.5 });
             
             for (let i = elements.length - 1; i >= 0; i--) {
                 const el = elements[i];
@@ -1221,6 +1867,14 @@
                         const dist = pointToLineDistance(x, y, p1.x, p1.y, p2.x, p2.y);
                         if (dist < threshold) return i;
                     }
+                } else if (el.type === 'polyline' && el.points) {
+                    // Check if point is near any segment of the polyline
+                    for (let j = 0; j < el.points.length - 1; j++) {
+                        const p1 = el.points[j];
+                        const p2 = el.points[j + 1];
+                        const dist = pointToLineDistance(x, y, p1.x, p1.y, p2.x, p2.y);
+                        if (dist < threshold) return i;
+                    }
                 }
             }
             
@@ -1228,7 +1882,7 @@
         }
         
         function findVertexAt(x, y) {
-            const threshold = 4; // Tight threshold for vertex selection
+            const threshold = getHitThreshold(4, { min: 2 });
             
             for (let i = elements.length - 1; i >= 0; i--) {
                 const el = elements[i];
@@ -1249,6 +1903,22 @@
                         if (Math.sqrt(Math.pow(x - p.x, 2) + Math.pow(y - p.y, 2)) < threshold) {
                             return { elementIndex: i, vertex: j };
                         }
+                    }
+                } else if (el.type === 'polyline' && el.points) {
+                    // Check each vertex of polyline
+                    for (let j = 0; j < el.points.length; j++) {
+                        const p = el.points[j];
+                        if (Math.sqrt(Math.pow(x - p.x, 2) + Math.pow(y - p.y, 2)) < threshold) {
+                            return { elementIndex: i, vertex: j };
+                        }
+                    }
+                } else if (el.type === 'circle') {
+                    const distToCenter = Math.sqrt(Math.pow(x - el.cx, 2) + Math.pow(y - el.cy, 2));
+                    if (distToCenter < threshold) {
+                        return { elementIndex: i, vertex: 'center' };
+                    }
+                    if (Math.abs(distToCenter - el.r) < threshold) {
+                        return { elementIndex: i, vertex: 'radius' };
                     }
                 }
             }
@@ -1288,7 +1958,7 @@
             } else if (el.type === 'circle' || el.type === 'arc') {
                 // Check if center is in rect (simplified)
                 return el.cx >= minX && el.cx <= maxX && el.cy >= minY && el.cy <= maxY;
-            } else if (el.type === 'polygon' && el.points) {
+            } else if ((el.type === 'polygon' || el.type === 'polyline') && el.points) {
                 // Check if any point is in rect
                 return el.points.some(p => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY);
             }
@@ -1376,7 +2046,8 @@
             if (el.type === 'line') return `(${el.x1},${el.y1}) → (${el.x2},${el.y2})`;
             if (el.type === 'circle') return `center: (${el.cx},${el.cy}), r: ${el.r}`;
             if (el.type === 'arc') return `center: (${el.cx},${el.cy}), r: ${el.r}`;
-            if (el.type === 'polygon') return `${el.points?.length || 0} points`;
+            if (el.type === 'polygon') return `${el.points?.length || 0} points (closed)`;
+            if (el.type === 'polyline') return `${el.points?.length || 0} points (open)`;
             return '';
         }
         
@@ -1469,11 +2140,83 @@
                 elements = [];
                 selectedElement = null;
                 selectedElements.clear();
+                resetArcConstruction();
                 updateElementList();
                 redraw();
             }
         }
         
+        // Component management
+        function getDefaultLabelPositions(width, height) {
+            const w = Number.isFinite(width) ? width : 80;
+            const h = Number.isFinite(height) ? height : 40;
+            return {
+                designator: [
+                    { x: Math.round(w / 2), y: -12 },
+                    { x: -12, y: Math.round(h / 2) }
+                ],
+                value: [
+                    { x: Math.round(w / 2), y: h + 12 },
+                    { x: w + 12, y: Math.round(h / 2) }
+                ]
+            };
+        }
+
+        function setLabelInputs(labels, width, height) {
+            const defaults = getDefaultLabelPositions(width, height);
+            const designator0 = labels?.designator?.[0] || defaults.designator[0];
+            const designator90 = labels?.designator?.[1] || defaults.designator[1];
+            const value0 = labels?.value?.[0] || defaults.value[0];
+            const value90 = labels?.value?.[1] || defaults.value[1];
+            const mappings = [
+                { id: 'designatorLabel0X', value: designator0.x },
+                { id: 'designatorLabel0Y', value: designator0.y },
+                { id: 'valueLabel0X', value: value0.x },
+                { id: 'valueLabel0Y', value: value0.y },
+                { id: 'designatorLabel90X', value: designator90.x },
+                { id: 'designatorLabel90Y', value: designator90.y },
+                { id: 'valueLabel90X', value: value90.x },
+                { id: 'valueLabel90Y', value: value90.y }
+            ];
+            mappings.forEach(entry => {
+                const input = document.getElementById(entry.id);
+                if (input) input.value = entry.value;
+            });
+            requestLabelPreviewUpdate({ immediate: true });
+        }
+
+        function readLabelInputs(width, height) {
+            const defaults = getDefaultLabelPositions(width, height);
+            const getNumber = (id, fallback) => {
+                const input = document.getElementById(id);
+                if (!input) return fallback;
+                const parsed = parseInt(input.value, 10);
+                return Number.isFinite(parsed) ? parsed : fallback;
+            };
+            return {
+                designator: [
+                    {
+                        x: getNumber('designatorLabel0X', defaults.designator[0].x),
+                        y: getNumber('designatorLabel0Y', defaults.designator[0].y)
+                    },
+                    {
+                        x: getNumber('designatorLabel90X', defaults.designator[1].x),
+                        y: getNumber('designatorLabel90Y', defaults.designator[1].y)
+                    }
+                ],
+                value: [
+                    {
+                        x: getNumber('valueLabel0X', defaults.value[0].x),
+                        y: getNumber('valueLabel0Y', defaults.value[0].y)
+                    },
+                    {
+                        x: getNumber('valueLabel90X', defaults.value[1].x),
+                        y: getNumber('valueLabel90Y', defaults.value[1].y)
+                    }
+                ]
+            };
+        }
+
         // Component management
         function updateComponentList() {
             const container = document.getElementById('componentList');
@@ -1488,21 +2231,25 @@
         function loadComponent(id) {
             currentComponentId = id;
             const comp = components[id];
+            const compWidthValue = comp.size?.width || 80;
+            const compHeightValue = comp.size?.height || 40;
             
             document.getElementById('compId').value = id;
             document.getElementById('compName').value = comp.name || '';
             document.getElementById('compPrefix').value = comp.designator?.prefix || '';
             document.getElementById('compAutoInc').checked = comp.designator?.autoIncrement !== false;
             document.getElementById('compDefault').value = comp.defaultValue || '';
-            document.getElementById('compWidth').value = comp.size?.width || 80;
-            document.getElementById('compHeight').value = comp.size?.height || 40;
+            document.getElementById('compWidth').value = compWidthValue;
+            document.getElementById('compHeight').value = compHeightValue;
             document.getElementById('modelName').value = comp.model?.name || '';
             document.getElementById('modelDef').value = comp.model?.definition || '';
             
             pins = comp.pins ? JSON.parse(JSON.stringify(comp.pins)) : [];
             elements = parseSVGToElements(comp.svg);
+            setLabelInputs(comp.labels, compWidthValue, compHeightValue);
             selectedElement = null;
             selectedElements.clear();
+            resetArcConstruction();
             
             updateComponentList();
             updatePinList();
@@ -1538,13 +2285,29 @@
             // Parse paths
             svg.querySelectorAll('path').forEach(path => {
                 const d = path.getAttribute('d');
-                if (d) {
-                    const strokeWidth = parseFloat(path.getAttribute('stroke-width')) || 4;
-                    const lines = parsePathToLines(d, scale);
-                    lines.forEach(line => {
-                        elements.push({ ...line, strokeWidth: strokeWidth * scale });
+                if (!d) return;
+                const strokeWidth = parseFloat(path.getAttribute('stroke-width')) || 4;
+                if (path.getAttribute('data-arc') === 'true') {
+                    const cx = Math.round(((parseFloat(path.getAttribute('data-cx')) || 0) * scale));
+                    const cy = Math.round(((parseFloat(path.getAttribute('data-cy')) || 0) * scale));
+                    const r = Math.max(1, Math.round(((parseFloat(path.getAttribute('data-r')) || 0) * scale)));
+                    const startAngle = parseFloat(path.getAttribute('data-start')) || 0;
+                    const endAngle = parseFloat(path.getAttribute('data-end')) || 0;
+                    elements.push({
+                        type: 'arc',
+                        cx,
+                        cy,
+                        r,
+                        startAngle,
+                        endAngle,
+                        strokeWidth: strokeWidth * scale
                     });
+                    return;
                 }
+                const lines = parsePathToLines(d, scale);
+                lines.forEach(line => {
+                    elements.push({ ...line, strokeWidth: strokeWidth * scale });
+                });
             });
             
             // Parse circles
@@ -1595,6 +2358,23 @@
                         points,
                         strokeWidth: strokeWidth * scale,
                         filled: poly.getAttribute('fill') !== 'none'
+                    });
+                }
+            });
+            
+            // Parse polylines
+            svg.querySelectorAll('polyline').forEach(poly => {
+                const pointsStr = poly.getAttribute('points');
+                if (pointsStr) {
+                    const points = pointsStr.trim().split(/\s+/).map(p => {
+                        const [x, y] = p.split(',').map(Number);
+                        return { x: Math.round(x * scale), y: Math.round(y * scale) };
+                    });
+                    const strokeWidth = parseFloat(poly.getAttribute('stroke-width')) || 4;
+                    elements.push({
+                        type: 'polyline',
+                        points,
+                        strokeWidth: strokeWidth * scale
                     });
                 }
             });
@@ -1691,29 +2471,37 @@
             const offsetX = Math.round((vbWidth - compWidth) / 2);
             const offsetY = Math.round((vbHeight - compHeight) / 2);
             
-            let paths = [];
-            let circles = [];
-            let polygons = [];
+            const svgParts = [];
             
             elements.forEach(el => {
+                const strokeWidth = el.strokeWidth || 4;
                 if (el.type === 'line') {
-                    paths.push(`M ${el.x1 + offsetX} ${el.y1 + offsetY} L ${el.x2 + offsetX} ${el.y2 + offsetY}`);
+                    const d = `M ${el.x1 + offsetX} ${el.y1 + offsetY} L ${el.x2 + offsetX} ${el.y2 + offsetY}`;
+                    svgParts.push(`<path fill="none" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" d="${d}"/>`);
                 } else if (el.type === 'circle') {
-                    circles.push(`<circle cx="${el.cx + offsetX}" cy="${el.cy + offsetY}" r="${el.r}" fill="${el.filled ? '#000000' : 'none'}"/>`);
+                    svgParts.push(`<circle cx="${el.cx + offsetX}" cy="${el.cy + offsetY}" r="${el.r}" fill="${el.filled ? '#000000' : 'none'}" stroke="#000000" stroke-width="${strokeWidth}"/>`);
+                } else if (el.type === 'arc') {
+                    const startX = el.cx + Math.cos(el.startAngle) * el.r;
+                    const startY = el.cy + Math.sin(el.startAngle) * el.r;
+                    const endX = el.cx + Math.cos(el.endAngle) * el.r;
+                    const endY = el.cy + Math.sin(el.endAngle) * el.r;
+                    let delta = el.endAngle - el.startAngle;
+                    while (delta <= -Math.PI * 2) delta += Math.PI * 2;
+                    while (delta >= Math.PI * 2) delta -= Math.PI * 2;
+                    const largeArcFlag = Math.abs(delta) > Math.PI ? 1 : 0;
+                    const sweepFlag = delta >= 0 ? 1 : 0;
+                    const d = `M ${startX + offsetX} ${startY + offsetY} A ${el.r} ${el.r} 0 ${largeArcFlag} ${sweepFlag} ${endX + offsetX} ${endY + offsetY}`;
+                    svgParts.push(`<path data-arc="true" data-cx="${el.cx}" data-cy="${el.cy}" data-r="${el.r}" data-start="${el.startAngle}" data-end="${el.endAngle}" fill="none" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" d="${d}"/>`);
                 } else if (el.type === 'polygon' && el.points) {
                     const pts = el.points.map(p => `${p.x + offsetX},${p.y + offsetY}`).join(' ');
-                    polygons.push(`<polygon points="${pts}" fill="${el.filled ? '#000000' : 'none'}"/>`);
+                    svgParts.push(`<polygon points="${pts}" fill="${el.filled ? '#000000' : 'none'}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linejoin="round"/>`);
+                } else if (el.type === 'polyline' && el.points) {
+                    const pts = el.points.map(p => `${p.x + offsetX},${p.y + offsetY}`).join(' ');
+                    svgParts.push(`<polyline points="${pts}" fill="none" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`);
                 }
             });
             
-            let svgContent = '';
-            if (paths.length > 0) {
-                svgContent += `<path fill="none" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="${paths.join(' ')}"/>`;
-            }
-            svgContent += circles.join('');
-            svgContent += polygons.join('');
-            
-            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vbWidth} ${vbHeight}"><g fill="none" stroke="#000000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">${svgContent}</g></svg>`;
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vbWidth} ${vbHeight}">${svgParts.join('')}</svg>`;
         }
         
         function updateComponent() {
@@ -1725,6 +2513,7 @@
             
             const compWidth = parseInt(document.getElementById('compWidth').value) || 80;
             const compHeight = parseInt(document.getElementById('compHeight').value) || 40;
+            const labels = readLabelInputs(compWidth, compHeight);
             
             const comp = {
                 name: document.getElementById('compName').value || id,
@@ -1743,16 +2532,7 @@
                     name: p.name,
                     position: { x: p.position.x, y: p.position.y }
                 })),
-                labels: {
-                    designator: [
-                        { x: Math.round(compWidth / 2), y: -12 },
-                        { x: -12, y: Math.round(compHeight / 2) }
-                    ],
-                    value: [
-                        { x: Math.round(compWidth / 2), y: compHeight + 12 },
-                        { x: compWidth + 12, y: Math.round(compHeight / 2) }
-                    ]
-                },
+                labels,
                 svg: elementsToSVG()
             };
             
@@ -1785,6 +2565,7 @@
             elements = [];
             pins = [];
             selectedElement = null;
+            resetArcConstruction();
             
             document.getElementById('compId').value = '';
             document.getElementById('compName').value = '';
@@ -1795,6 +2576,9 @@
             document.getElementById('compHeight').value = '40';
             document.getElementById('modelName').value = '';
             document.getElementById('modelDef').value = '';
+            const defaultWidth = parseInt(document.getElementById('compWidth').value, 10) || 80;
+            const defaultHeight = parseInt(document.getElementById('compHeight').value, 10) || 40;
+            setLabelInputs(getDefaultLabelPositions(defaultWidth, defaultHeight), defaultWidth, defaultHeight);
             
             updateComponentList();
             updatePinList();
