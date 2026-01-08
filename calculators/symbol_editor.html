@@ -728,6 +728,8 @@
         let undoStack = []; // Stack of actions for undo
         let originalElementState = null; // Element state at start of drag
         let originalElementStates = new Map(); // Map of element states for multi-drag
+        let draggingPinIndex = null;
+        let pinDragOffset = null;
         let zoomLevel = 3;
         const MIN_ZOOM = 1;
         const MAX_ZOOM = 10;
@@ -1584,6 +1586,23 @@
             const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
             
             if (mode === 'select') {
+                const pinIndex = findPinNearPosition(pos);
+                if (pinIndex !== -1) {
+                    draggingPinIndex = pinIndex;
+                    const pin = pins[pinIndex];
+                    const beforePosition = { x: pin.position.x, y: pin.position.y };
+                    pinDragOffset = {
+                        x: pin.position.x - pos.x,
+                        y: pin.position.y - pos.y
+                    };
+                    undoStack.push({
+                        type: 'move-pin',
+                        index: pinIndex,
+                        before: beforePosition
+                    });
+                    return;
+                }
+
                 const shiftKey = e.shiftKey;
                 
                 // First check if clicking on a vertex
@@ -1683,6 +1702,11 @@
             const pos = canvasToComponent(cx, cy, { snap: shouldSnap });
             
             coordIndicator.textContent = `X: ${pos.x.toFixed(2)}, Y: ${pos.y.toFixed(2)}`;
+
+            if (draggingPinIndex !== null) {
+                applyPinDragPosition(pos);
+                return;
+            }
 
             if (mode === 'arc' && arcStage > 0) {
                 arcPreviewPoint = pos;
@@ -1857,6 +1881,20 @@
         }
         
         function onMouseUp(e) {
+            if (draggingPinIndex !== null) {
+                const pin = pins[draggingPinIndex];
+                const lastAction = undoStack[undoStack.length - 1];
+                if (lastAction && lastAction.type === 'move-pin') {
+                    const before = lastAction.before;
+                    if (!pin || (pin.position.x === before.x && pin.position.y === before.y)) {
+                        undoStack.pop();
+                    }
+                }
+                updatePinList();
+                redraw();
+                resetPinDragState();
+                return;
+            }
             if (isSelecting) {
                 // Finish selection rectangle
                 if (selectionRect) {
@@ -2147,6 +2185,43 @@
             }
             return false;
         }
+
+        function findPinNearPosition(pos) {
+            if (!pos || !pins.length) return -1;
+            const threshold = getHitThreshold(8, { min: 2, max: 12 });
+            for (let i = pins.length - 1; i >= 0; i--) {
+                const pinPos = pins[i]?.position;
+                if (!pinPos) continue;
+                const dist = Math.hypot(pinPos.x - pos.x, pinPos.y - pos.y);
+                if (dist <= threshold) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function applyPinDragPosition(pos) {
+            if (draggingPinIndex === null) return;
+            const pin = pins[draggingPinIndex];
+            if (!pin || !pos) return;
+            const gridSize = parseInt(document.getElementById('gridSize').value, 10) || 1;
+            const snapToGrid = document.getElementById('snapToGrid').checked;
+            let targetX = pos.x + (pinDragOffset?.x || 0);
+            let targetY = pos.y + (pinDragOffset?.y || 0);
+            if (snapToGrid) {
+                targetX = Math.round(targetX / gridSize) * gridSize;
+                targetY = Math.round(targetY / gridSize) * gridSize;
+            }
+            pin.position.x = targetX;
+            pin.position.y = targetY;
+            updatePinList();
+            redraw();
+        }
+
+        function resetPinDragState() {
+            draggingPinIndex = null;
+            pinDragOffset = null;
+        }
         
         // Pin management
         function addPin(pos) {
@@ -2312,6 +2387,12 @@
                 action.states.forEach((state, idx) => {
                     elements[idx] = JSON.parse(JSON.stringify(state));
                 });
+            } else if (action.type === 'move-pin') {
+                const pin = pins[action.index];
+                if (pin && action.before) {
+                    pin.position = { x: action.before.x, y: action.before.y };
+                }
+                updatePinList();
             }
             
             updateElementList();
